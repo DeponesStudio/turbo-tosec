@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+venv/
+.env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# DuckDB veritabanı (Bunu sakın yükleme, boyutu büyük!)
+*.duckdb
+*.db
+
+# VS Code
+.vscode/
+
+# İşletim sistemi dosyaları
+Thumbs.db
+.DS_Store
