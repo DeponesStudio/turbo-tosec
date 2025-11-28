@@ -21,7 +21,7 @@ Bu proje Python 3.x gerektirir.
 git clone [https://github.com/KULLANICI_ADINIZ/turbo-tosec.git](https://github.com/berkacunas/turbo-tosec.git)
 cd turbo-tosec
 pip install -r requirements.txt
-````
+```
 
 ## 🛠️ Kullanım
 
@@ -31,13 +31,30 @@ Bu araç, TOSEC DAT dosyalarını işler. En güncel DAT paketini [TOSEC Resmi S
 
 ### 2\. Çalıştırın
 
+#### Standart Mod (Güvenli)
+Hata ayıklama (debugging) veya küçük koleksiyonlar için en iyisidir. Tek bir iş parçacığı (single thread) kullanır.
 ```bash
-# Temel Kullanım
-python tosec_importer.py --input "E:\Arsiv\TOSEC-v2025-03-13"
-
-# Çıktı ismini belirterek kullanım
-python tosec_importer.py --input "./tosec_dats" --output "kutuphane.duckdb"
+python tosec_importer.py -i "/dosya/yolu/TOSEC" -o "tosec.duckdb"
 ```
+
+#### Turbo Mod (Çok İş Parçacıklı) 🔥
+
+İşlemcinizin tüm gücünü serbest bırakın\! Tam TOSEC arşivini içe aktarmak için önerilir.
+
+```bash
+# 8 işçi thread ve daha büyük işlem (batch) boyutu kullanımı
+python tosec_importer.py -i "/dosya/yolu/TOSEC" -w 8 -b 5000
+```
+
+#### Komut Satırı Argümanları
+
+| Parametre | Açıklama | Varsayılan |
+| :--- | :--- | :--- |
+| `-i, --input` | DAT dosyalarını içeren kök dizinin yolu. | **Zorunlu** |
+| `-o, --output` | Oluşturulacak DuckDB veritabanı dosyasının yolu. | `tosec.duckdb` |
+| `-w, --workers` | Paralel ayrıştırma için kullanılacak iş parçacığı sayısı. | `1` |
+| `-b, --batch-size`| Her veritabanı işleminde (transaction) eklenecek kayıt sayısı. | `1000` |
+| `--no-open-log` | Hata oluştuğunda log dosyasını otomatik olarak **açma**. | `False` |
 
 ## 🔍 Örnek Sorgular (DuckDB / SQL)
 
@@ -48,7 +65,7 @@ Oluşturulan veritabanını **DBeaver**, **VSCode SQLTools** veya **Python** ile
 ```sql
 SELECT game_name, rom_name 
 FROM roms 
-WHERE system LIKE '%Commodore 64%' 
+WHERE platform LIKE '%Commodore 64%' 
   AND rom_name LIKE '%[!]%';
 ```
 

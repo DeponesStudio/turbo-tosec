@@ -43,6 +43,7 @@ def create_database(db_path: str):
     conn.execute("""
         CREATE TABLE roms (
             dat_filename VARCHAR,
+            platform VARCHAR,
             game_name VARCHAR,
             description VARCHAR,
             rom_name VARCHAR,
@@ -81,6 +82,8 @@ def parse_dat_file(file_path: str) -> List[Tuple]:
     except:
         system_name = "Unknown"
 
+    platform = dat_filename.split(' - ')[0]
+
     tree = ET.parse(file_path)
     root = tree.getroot()
     
@@ -91,9 +94,9 @@ def parse_dat_file(file_path: str) -> List[Tuple]:
         description = desc_node.text if desc_node is not None else ""
         
         for rom in game.findall('rom'):
-            rows.append((dat_filename, game_name, description, rom.get('name'),
-                rom.get('size'), rom.get('crc'), rom.get('md5'), rom.get('sha1'),
-                rom.get('status', 'good'), system_name))
+            rows.append((dat_filename, platform, game_name, description, 
+                         rom.get('name'), rom.get('size'), rom.get('crc'), rom.get('md5'), 
+                         rom.get('sha1'), rom.get('status', 'good'), system_name))
 
     return rows
 
@@ -140,7 +143,7 @@ def main():
     def flush_buffer():
         nonlocal total_roms
         if buffer:
-            conn.executemany("""INSERT INTO roms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", buffer)
+            conn.executemany("""INSERT INTO roms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", buffer)
             total_roms += len(buffer)
             buffer.clear()
     
