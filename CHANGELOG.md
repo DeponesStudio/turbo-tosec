@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/berkacunas/turbo-tosec/compare/v1.1.0...v1.2.0) (2025-11-28)
+
+
+### Features
+
+* **ci:** add automated cross-platform build workflow for single-file binaries ([cc2c60c](https://github.com/berkacunas/turbo-tosec/commit/cc2c60c80f533dc7b60ea098728ca7318dc4dc50))
+
 # [1.1.0](https://github.com/berkacunas/turbo-tosec/compare/v1.0.0...v1.1.0) (2025-11-28)
 
 
