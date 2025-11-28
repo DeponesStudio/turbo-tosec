@@ -31,10 +31,6 @@ This tool processes TOSEC DAT files (metadata). Download the latest DAT package 
 
 ### 2\. Run the Importer
 
-
-
-
-
 #### Standard Mode (Safe)
 Best for debugging or small collections. Uses a single thread.
 ```bash

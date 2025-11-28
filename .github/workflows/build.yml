@@ -1,0 +1,80 @@
+name: Build and Upload Binaries
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  # --- WINDOWS BUILD ---
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        # Build using spec file
+        run: pyinstaller turbo-tosec.spec
+
+      - name: Rename & Prepare
+        shell: bash
+        run: |
+          cd dist
+          # Filename: turbo-tosec_v1.0.0_Windows.exe
+          mv turbo-tosec.exe turbo-tosec_${{ github.event.release.tag_name }}_Windows.exe
+
+      - name: Upload Windows Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/turbo-tosec_*_Windows.exe
+
+  # --- LINUX BUILD ---
+  build-linux:
+    name: Build Linux Binary
+    runs-on: ubuntu-22.04 # for GLIBC compatibility
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller turbo-tosec.spec
+
+      - name: Rename & Prepare
+        run: |
+          cd dist
+          # Filename: turbo-tosec_v1.0.0_Linux
+          mv turbo-tosec turbo-tosec_${{ github.event.release.tag_name }}_Linux
+          tar -czvf turbo-tosec_${{ github.event.release.tag_name }}_Linux.tar.gz turbo-tosec_${{ github.event.release.tag_name }}_Linux
+
+      - name: Upload Linux Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz

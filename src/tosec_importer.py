@@ -149,7 +149,7 @@ def main():
     
     # --- PROCESSING LOGIC ---
     if args.workers < 2:
-        # === SERIAL MODE (Default) ===
+        # ### SERIAL MODE (Default) ###
         # No overhead of threading, best for debugging or small tasks.
         with tqdm(total=count_files, unit="file") as pbar:
             for file_path in all_dat_files:
@@ -170,7 +170,7 @@ def main():
                 pbar.set_postfix(stats)
                 pbar.update(1)
     else:
-        # === PARALLEL MODE (Turbo) ===
+        # ### PARALLEL MODE (Turbo) ###
         # Workers parse XML, Main Thread writes to DB.
         try:
             with tqdm(total=count_files, unit="file") as pbar:
