@@ -1,9 +1,8 @@
 import os
 import pytest
 import duckdb
-from tosec_importer import parse_dat_file, create_database
+from src.tosec_importer import parse_dat_file, create_database
 
-# Test için minik bir sahte TOSEC DAT içeriği
 SAMPLE_DAT_XML = """<?xml version="1.0"?>
 <datafile>
     <header>
