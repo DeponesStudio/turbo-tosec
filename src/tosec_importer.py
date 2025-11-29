@@ -193,7 +193,7 @@ def main():
     if args.workers == 0: 
         args.workers = os.cpu_count() or 1
         
-    print(f"🚀 Starting import with {args.workers} worker(s)...")
+    print(f"🚀 Starting import with {args.workers} worker(s)...", flush=True)
     
     buffer = []
     
@@ -290,8 +290,14 @@ def main():
             print("launching log viewer...")
             open_file_with_default_app(log_filename)
     else:
+        logging.shutdown()
+        
         if os.path.exists(log_filename):
-            os.remove(log_filename)
+            try:
+                os.remove(log_filename)
+            except Exception as e:
+                print(f"\n⚠️ Could not delete empty log file: {e}")
+                
         print("✨ Clean import. No errors.")
         
 if __name__ == "__main__":
