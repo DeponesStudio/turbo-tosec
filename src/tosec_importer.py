@@ -1,3 +1,38 @@
+"""
+Turbo-TOSEC: High-Performance TOSEC DAT Importer
+================================================
+
+This module parses TOSEC DAT files (XML format) and imports them into a DuckDB database.
+It is designed to handle massive collections efficiently using multi-threading.
+
+Architecture & Concurrency Design
+---------------------------------
+The importer uses a "Producer-Consumer" pattern adapted for DuckDB's single-writer constraint:
+
+1.  **Workers (Producers):**
+    - Managed by a `ThreadPoolExecutor`.
+    - Responsible for I/O (reading files) and CPU (parsing XML) tasks.
+    - They do NOT write to the database. They return parsed tuples to the main thread.
+    - This ensures thread-safety without complex locking mechanisms.
+
+2.  **Main Thread (Consumer & Writer):**
+    - Submits tasks to workers.
+    - Collects results as they complete (`as_completed`).
+    - Buffers results and performs batched inserts (`executemany`) into DuckDB.
+    - Updates the progress bar (`tqdm`).
+
+Error Handling Strategy
+-----------------------
+- **Console:** Kept clean for the progress bar. Only critical crashes are printed.
+- **Log File:** All skipped files, malformed XMLs, or read errors are written to `import_errors.log`.
+- **Resilience:** A single corrupt file does not stop the process. It is logged and skipped.
+
+Usage:
+    python tosec_importer.py -i "path/to/dats" -w 8
+
+Author: Depones Studio
+License: GPL v3
+"""
 import os
 import sys
 from datetime import datetime

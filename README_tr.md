@@ -1,24 +1,39 @@
 # 🚀 turbo-tosec
 
-> **TOSEC veritabanlarını ışık hızında sorgulamak için DuckDB tabanlı yüksek performanslı importer.**
+[![CI/CD](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml/badge.svg)](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Latest Release](https://img.shields.io/github/v/release/berkacunas/turbo-tosec)](https://github.com/berkacunas/turbo-tosec/releases)
 
-**turbo-tosec**, devasa **TOSEC (The Old School Emulation Center)** DAT koleksiyonlarını tarar, ayrıştırır (parse) ve saniyeler içinde sorgulanabilir, tek parça bir **DuckDB** veritabanına dönüştürür.
+> **TOSEC veritabanlarını ışık hızında sorgulamak için DuckDB tabanlı, yüksek performanslı içe aktarma aracı.**
 
-Arşivciler ve retro oyun tutkunları için; yüz binlerce dosyalık XML/DAT yığınlarını, SQL ile anında sorgulanabilir modern bir veriye dönüştürür.
+**turbo-tosec**, devasa **TOSEC (The Old School Emulation Center)** DAT koleksiyonunu tarar, ayrıştırır ve anında sorgulanabilir tek bir **DuckDB** veritabanı dosyasına dönüştürür.
+
+Arşivciler ve retro oyun tutkunları için tasarlanan bu araç, yüz binlerce XML/DAT dosyasından oluşan yığınları, saniyeler içinde SQL ile sorgulanabilen modern bir formata çevirir.
+
+-----
+
+### 📥 Hemen İndir (Python Gerekmez)
+
+Python kurmakla uğraşmak istemiyorsanız, işletim sisteminiz için hazır çalıştırılabilir dosyayı indirebilirsiniz:
+
+  * **Windows:** [`turbo-tosec_v1.2.2_Windows.exe` İndir](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D\(https://github.com/berkacunas/turbo-tosec/releases/latest\))
+  * **Linux:** [`turbo-tosec_v1.2.2_Linux.tar.gz` İndir](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D\(https://github.com/berkacunas/turbo-tosec/releases/latest\))
+
+-----
 
 ## ⚡ Neden turbo-tosec?
 
-- **Hız Odaklı:** Python'un XML parsing gücünü DuckDB'nin "Bulk Insert" yeteneğiyle birleştirir.
-- **Sıfır Bağımlılık:** Harici bir sunucu (MySQL, Postgres) gerektirmez. Tek çıktı `.duckdb` dosyasıdır.
-- **Akıllı Tarama:** Alt klasörlerdeki binlerce `.dat` dosyasını otomatik bulur (`recursive scan`).
-- **İlerleme Takibi:** `tqdm` ile detaylı, canlı işlem durumu gösterir.
+  - **Hız Odaklı:** Maksimum veri işleme hızı için Python'un XML ayrıştırma gücünü DuckDB'nin "Toplu Ekleme" (Bulk Insert) yetenekleriyle birleştirir.
+  - **Bağımlılık Yok:** Harici sunuculara (MySQL, Postgres) ihtiyaç duymaz. Çıktı, taşınabilir tek bir `.duckdb` dosyasıdır.
+  - **Akıllı Tarama:** İç içe geçmiş alt klasörlerdeki binlerce `.dat` dosyasını otomatik olarak bulur (`recursive scan`).
+  - **İlerleme Takibi:** `tqdm` aracılığıyla detaylı ve gerçek zamanlı ilerleme çubuğu sunar.
 
 ## 📦 Kurulum
 
 Bu proje Python 3.x gerektirir.
 
 ```bash
-git clone [https://github.com/KULLANICI_ADINIZ/turbo-tosec.git](https://github.com/berkacunas/turbo-tosec.git)
+git clone https://github.com/berkacunas/turbo-tosec.git
 cd turbo-tosec
 pip install -r requirements.txt
 ```
@@ -27,12 +42,14 @@ pip install -r requirements.txt
 
 ### 1\. Veriyi Hazırlayın
 
-Bu araç, TOSEC DAT dosyalarını işler. En güncel DAT paketini [TOSEC Resmi Sitesinden](https://www.tosecdev.org/downloads) indirin ve bir klasöre çıkarın.
+Bu araç TOSEC DAT dosyalarını (metadata) işler. En güncel DAT paketini [Resmi TOSEC Web Sitesinden](https://www.tosecdev.org/downloads) indirin ve bir klasöre çıkartın.
 
-### 2\. Çalıştırın
+### 2\. İçe Aktarıcıyı Çalıştırın
 
 #### Standart Mod (Güvenli)
-Hata ayıklama (debugging) veya küçük koleksiyonlar için en iyisidir. Tek bir iş parçacığı (single thread) kullanır.
+
+Hata ayıklama veya küçük koleksiyonlar için en iyisidir. Tek bir iş parçacığı (single thread) kullanır.
+
 ```bash
 python tosec_importer.py -i "/dosya/yolu/TOSEC" -o "tosec.duckdb"
 ```
@@ -56,9 +73,21 @@ python tosec_importer.py -i "/dosya/yolu/TOSEC" -w 8 -b 5000
 | `-b, --batch-size`| Her veritabanı işleminde (transaction) eklenecek kayıt sayısı. | `1000` |
 | `--no-open-log` | Hata oluştuğunda log dosyasını otomatik olarak **açma**. | `False` |
 
+## ⚡ Performans
+
+*Yaklaşık 3.000 DAT dosyası (1 milyon ROM kaydı) içeren bir veri seti baz alınarak yapılan test sonuçlarıdır.*
+
+| Mod | İşçiler (Workers) | Süre |
+| :--- | :--- | :--- |
+| **Standart** | 1 | \~45 saniye |
+| **Turbo** | 4 | \~15 saniye |
+| **Turbo Max** | 8 | \~9 saniye |
+
+> *Not: Performans, disk okuma hızı (Disk I/O) darboğaz oluşturana kadar işlemci çekirdek sayısıyla orantılı olarak artar.*
+
 ## 🔍 Örnek Sorgular (DuckDB / SQL)
 
-Oluşturulan veritabanını **DBeaver**, **VSCode SQLTools** veya **Python** ile açıp şu sorguları atabilirsiniz:
+Oluşturulan veritabanını **DBeaver**, **VSCode SQLTools** veya **Python** kullanarak açabilir ve aşağıdaki gibi sorgular çalıştırabilirsiniz:
 
 **Doğrulanmış [\!] Commodore 64 Oyunlarını Bul:**
 
@@ -69,7 +98,7 @@ WHERE platform LIKE '%Commodore 64%'
   AND rom_name LIKE '%[!]%';
 ```
 
-**Elimdeki Dosyanın Orjinalliğini Kontrol Et (Hash ile):**
+**Yerel Bir Dosyayı Doğrula (Hash ile):**
 
 ```sql
 SELECT * FROM roms WHERE md5 = 'DOSYANIZIN_MD5_HASH_DEGERI';
@@ -77,7 +106,24 @@ SELECT * FROM roms WHERE md5 = 'DOSYANIZIN_MD5_HASH_DEGERI';
 
 ## 📄 Lisans
 
-Bu proje [MIT Lisansı](https://choosealicense.com/licenses/mit/) altında lisanslanmıştır.
-*Not: Bu proje TOSEC veritabanı dosyalarını içermez, sadece bu dosyaları işlemek için bir araç sağlar.*
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-**Copyright © 2025 berkacunas & DeponesStudio.**
+-----
+
+## ❤️ Projeyi Destekleyin
+
+Glyph (ve turbo-tosec), bağımsız bir geliştirici tarafından geliştirilmekte ve sürdürülmektedir. Eğer bu aracı faydalı bulduysanız ve geliştirmeyi desteklemek (veya sadece hazır derlenmiş `.exe` için teşekkür etmek) isterseniz, lütfen bağış yapmayı düşünün\!
+
+\<a href="[https://github.com/sponsors/berkacunas](https://github.com/sponsors/berkacunas)"\>
+\<img src="[https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge\&logo=github-sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors)" height="50" alt="GitHub'da Sponsor Ol"\>
+\</a\>
+
+\<a href="[https://www.buymeacoffee.com/depones](https://www.buymeacoffee.com/depones)" target="\_blank"\>\<img src="[https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)" alt="Buy Me A Coffee" style="height: 60px \!important;width: 217px \!important;" \>\</a\>
+
+  * **Bu repoya yıldız verin\!** ⭐ Görünürlüğe çok yardımcı olur.
+
+-----
+
+*Yasal Uyarı: Bu proje herhangi bir TOSEC veritabanı dosyası veya ROM barındırmaz. Yalnızca TOSEC projesi tarafından sağlanan metadata dosyalarını işlemek için bir araç sunar.*
+
+**Telif Hakkı © 2025 berkacunas & DeponesStudio.**
