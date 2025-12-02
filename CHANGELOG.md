@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/berkacunas/turbo-tosec/compare/v1.3.6...v1.4.0) (2025-12-02)
+
+
+### Features
+
+* implement resume capability and database metadata ([c2da23e](https://github.com/berkacunas/turbo-tosec/commit/c2da23eb6c94e99c84856011ce3baaa30f8e371c))
+* **importer:** implement smart resume capability with db version verification ([9e1c974](https://github.com/berkacunas/turbo-tosec/commit/9e1c97428b4aab504963eb44ec1fc1b061c10596))
+
 ## [1.3.6](https://github.com/berkacunas/turbo-tosec/compare/v1.3.5...v1.3.6) (2025-11-30)
 
 
