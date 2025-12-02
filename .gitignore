@@ -10,6 +10,7 @@ __pycache__/
 # DuckDB database files
 *.duckdb
 *.db
+*.wal
 
 # VS Code
 .vscode/

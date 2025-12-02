@@ -174,8 +174,17 @@ def main():
     parser.add_argument("--about", action="store_true", help="Show program information, philosophy, and safety defaults.")
     parser.add_argument("--version", "-v", action="version", version=f"{__version__ if '__version__' in globals() else '1.2.2'}")
     
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+        
     args = parser.parse_args()
     
+    if args.workers > 4:
+        print(f"⚠️  WARNING: Using {args.workers} threads.")
+        print("   If you are using a mechanical HDD, performance may drop due to seek time.")
+        print("   Recommended for HDD: 1-4 threads. Recommended for SSD: 4-16 threads.")
+        
     if args.about:
         print(f"""
  *** turbo-tosec v{__version__ if '__version__' in globals() else '1.2.2'} ***
@@ -261,11 +270,11 @@ def main():
                 elif args.force_new:
                     print("💥 --force-new detected. Wiping old database.")
                     resume_mode = False
-                else:
-                    # Interactive Mode (Ask User)
-                    print(f"\nFound existing database with {processed_count} processed files.")
-                    q = input("❓ [R]esume interrupted import or [S]tart fresh? [R/s]: ").lower()
-                    resume_mode = q == 'r'
+            else:
+                # Interactive Mode (Ask User)
+                print(f"\nFound existing database with {processed_count} processed files.")
+                q = input("❓ [R]esume interrupted import or [S]tart fresh? [R/s]: ").lower()
+                resume_mode = q == 'r'
             
     files_to_process = []
     
