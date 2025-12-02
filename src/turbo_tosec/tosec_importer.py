@@ -168,6 +168,8 @@ def main():
     parser.add_argument("--output", "-o", default="tosec.duckdb", help="Name/path of the DuckDB file to be created.")
     parser.add_argument("--workers", "-w", type=int, default=1, help="Number of worker threads (Default: 1). Tip: Use 0 to auto-detect CPU count.")
     parser.add_argument("--batch-size", "-b", type=int, default=1000, help="Number of rows to insert per batch transaction (Default: 1000).")
+    parser.add_argument("--resume", action="store_true", help="Automatically resume if database exists (skip prompt).")
+    parser.add_argument("--force-new", action="store_true", help="Force overwrite existing database (skip prompt).")
     parser.add_argument("--no-open-log", action="store_false", dest="open_log", default=True, help="Do NOT automatically open the log file if errors occur.")
     parser.add_argument("--about", action="store_true", help="Show program information, philosophy, and safety defaults.")
     parser.add_argument("--version", "-v", action="version", version=f"{__version__ if '__version__' in globals() else '1.2.2'}")
@@ -252,11 +254,18 @@ def main():
             processed_count = conn.execute("SELECT COUNT(*) FROM processed_files").fetchone()[0]
             
             if processed_count > 0:
-                print(f"\nFound existing database with {processed_count} processed files.")
-                
-                q = input("❓ [R]esume interrupted import or [S]tart fresh? [R/s]: ").lower()
-                resume_mode = q == 's'
-                
+                # Flag Control 
+                if args.resume:
+                    print(f"🔄 --resume detected. Resuming import. ({processed_count} files already processed)")
+                    resume_mode = True
+                elif args.force_new:
+                    print("💥 --force-new detected. Wiping old database.")
+                    resume_mode = False
+                else:
+                    # Interactive Mode (Ask User)
+                    print(f"\nFound existing database with {processed_count} processed files.")
+                    q = input("❓ [R]esume interrupted import or [S]tart fresh? [R/s]: ").lower()
+                    resume_mode = q == 'r'
             
     files_to_process = []
     
