@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/berkacunas/turbo-tosec/compare/v1.5.0...v1.6.0) (2025-12-03)
+
+
+### Features
+
+* **ui:** switch progress bar from file count to byte-based tracking for accuracy ([8681edf](https://github.com/berkacunas/turbo-tosec/commit/8681edf056325ef5564dfbbe5d78628354de6385))
+
 # [1.5.0](https://github.com/berkacunas/turbo-tosec/compare/v1.4.0...v1.5.0) (2025-12-02)
 
 
