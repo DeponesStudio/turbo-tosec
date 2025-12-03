@@ -307,6 +307,15 @@ def main():
     
     count_files = len(files_to_process) # for progress bar
 
+    print("📊 Calculating total size for progress bar...")
+    
+    # 1. Total size of all files (Target)
+    total_bytes = sum(os.path.getsize(f) for f in all_dat_files)
+    remaining_bytes = sum(os.path.getsize(f) for f in files_to_process)
+    initial_bytes = total_bytes - remaining_bytes
+
+    print(f"🚀 Starting import with {args.workers} worker(s)...")
+
     total_roms = 0
     error_count = 0
     if args.workers == 0: 
@@ -333,7 +342,8 @@ def main():
     
     try:
         # Processing logic 
-        with tqdm(total=count_files, unit="file") as pbar:
+        with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, unit_divisor=1024) as pbar:
+        
             stop_monitor = threading.Event()
             
             def monitor_progress():
@@ -363,7 +373,13 @@ def main():
                         stats["Errors"] = error_count
                     
                     pbar.set_postfix(stats)
-                    pbar.update(1)
+                    
+                    try:
+                        f_size = os.path.getsize(file_path)
+                        pbar.update(f_size)
+                    except:
+                        pbar.update(0) # File deleted during processing?, etc..
+                        
             else:
                 # ### PARALLEL MODE (Turbo) ###
                 # Workers parse XML, Main Thread writes to DB.
@@ -390,7 +406,12 @@ def main():
                             stats["Errors"] = error_count
                         
                         pbar.set_postfix(stats)
-                        pbar.update(1)
+                        
+                        try:
+                            f_size = os.path.getsize(file_path)
+                            pbar.update(f_size)
+                        except:
+                            pbar.update(0)
         
             stop_monitor.set()
             monitor_thread.join()
