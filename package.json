@@ -11,8 +11,22 @@
     "type": "git",
     "url": "git+https://github.com/berkacunas/turbo-tosec.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "tosec",
+    "retro-gaming",
+    "emulation",
+    "dat-files",
+    "rom-management",
+    "duckdb",
+    "python",
+    "cli",
+    "data-engineering",
+    "etl",
+    "parquet",
+    "xml-parser",
+    "high-performance"
+  ],
+  "author": "Berk Acunas & Depones Studio",
   "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/berkacunas/turbo-tosec/issues"
