@@ -157,35 +157,36 @@ def parse_dat_file(file_path: str) -> List[Tuple]:
 
     return rows
 
-def export_to_parquet(db_path: str, parquet_path: str):
+def export_to_parquet(db_path: str, parquet_path: str, threads: int = 1):
     
     if not os.path.exists(db_path):
         print(f"  Database not found: {db_path}")
         return
 
-    print(f"  Exporting database to Parquet: {parquet_path} ...")
+    print(f"  Exporting database to Parquet: {parquet_path} (Threads: {threads})...")
     start = time.time()
     
     try:
         conn = duckdb.connect(db_path)
+        conn.execute(f"PRAGMA threads={threads}")
         conn.execute(f"COPY roms TO '{parquet_path}' (FORMAT PARQUET, COMPRESSION 'SNAPPY')")
         conn.close()
         print(f"  Export completed in {time.time() - start:.2f}s")
     except Exception as e:
         print(f"  Export failed: {e}")
 
-def import_from_parquet(db_path: str, parquet_path: str):
+def import_from_parquet(db_path: str, parquet_path: str, threads: int = 1):
     
     if not os.path.exists(parquet_path):
         print(f"  Parquet file not found: {parquet_path}")
         return
 
-    print(f"  Importing Parquet into database: {db_path} ...")
+    print(f"  Importing Parquet into database: {db_path} (Threads: {threads})...")
     start = time.time()
     
     try:
         conn = create_database(db_path) # Şemayı oluştur
-
+        conn.execute(f"PRAGMA threads={threads}")   
         # Read Parquet and insert into table
         conn.execute(f"INSERT INTO roms SELECT * FROM read_parquet('{parquet_path}')")
         
@@ -228,6 +229,7 @@ def main():
     # Parquet Command (Import/Export)
     parser_parquet = subparsers.add_parser("parquet", help="Import/Export data using Parquet files.")
     parser_parquet.add_argument("--db", "-d", default="tosec.duckdb", help="Target/Source DuckDB file.")
+    parser_parquet.add_argument("--workers", "-w", type=int, default=1, help="Max threads for DuckDB engine (Default: 1).")
     group = parser_parquet.add_mutually_exclusive_group(required=True)
     group.add_argument("--import-file", "-i", help="Import FROM this Parquet file.")
     group.add_argument("--export-file", "-o", help="Export TO this Parquet file.")
@@ -273,10 +275,11 @@ def main():
     
     try:
         if args.command == "parquet":
+            
             if args.export_file:
-                export_to_parquet(args.db, args.export_file)
+                export_to_parquet(args.db, args.export_file, args.workers)
             elif args.import_file:
-                import_from_parquet(args.db, args.import_file)
+                import_from_parquet(args.db, args.import_file, args.workers)
             return  # parquet subcommand used without any option
         
         elif args.command == "scan":
