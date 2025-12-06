@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/berkacunas/turbo-tosec/compare/v1.7.0...v1.7.1) (2025-12-06)
+
+
+### Bug Fixes
+
+* add parquet processing cpu limit ([fa46705](https://github.com/berkacunas/turbo-tosec/commit/fa467051fc4e8a0b3705785766f1b9580f7d2924))
+
 # [1.7.0](https://github.com/berkacunas/turbo-tosec/compare/v1.6.0...v1.7.0) (2025-12-06)
 
 
