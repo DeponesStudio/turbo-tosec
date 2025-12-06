@@ -1,7 +1,7 @@
 import os
 import pytest
 import duckdb
-from turbo_tosec.tosec_importer import parse_dat_file, create_database
+from turbo_tosec.tosec_importer import parse_xml_dat_file, create_database
 from turbo_tosec._version import __version__
 
 SAMPLE_DAT_XML = """<?xml version="1.0"?>
@@ -28,7 +28,7 @@ def test_platform_parsing(tmp_path):
     dat_file = dats_dir / filename
     dat_file.write_text(SAMPLE_DAT_XML, encoding="utf-8")
 
-    results = parse_dat_file(str(dat_file))
+    results = parse_xml_dat_file(str(dat_file))
 
     assert len(results) == 1, "Parser should have found exactly 1 game"
     

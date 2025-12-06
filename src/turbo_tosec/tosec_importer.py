@@ -72,7 +72,7 @@ def open_file_with_default_app(filepath):
         else: # Linux
             subprocess.call(('xdg-open', filepath))
     except Exception as e:
-        print(f"\n⚠️ Could not open log file automatically: {e}")
+        print(f"\n  Could not open log file automatically: {e}")
         
 def create_database(db_path: str):
     
@@ -131,6 +131,22 @@ def get_dat_files(root_dir: str) -> List[str]:
     return dat_files
 
 def parse_dat_file(file_path: str) -> List[Tuple]:
+    """
+    Main entry point for parsing. Detects format (XML vs CMP) and dispatches.
+    """
+    # Look at file type first
+    if _is_cmp_file(file_path):
+        # CMP (Legacy) Formatı
+        try:
+            return parse_cmp_dat_file(file_path)
+        except Exception as e:
+            logging.error(f"FAILED (CMP Parse): {file_path} -> {e}")
+            return []
+    else:
+        # Starndard XML Format (Default)
+        return parse_xml_dat_file(file_path)
+    
+def parse_xml_dat_file(file_path: str) -> List[Tuple]:
    
     rows = []
     dat_filename = os.path.basename(file_path)
@@ -198,6 +214,114 @@ def import_from_parquet(db_path: str, parquet_path: str, threads: int = 1):
         print(f"  Total Rows in DB: {count:,}")
     except Exception as e:
         print(f"  Import failed: {e}")
+        
+def _is_cmp_file(file_path: str) -> bool:
+    """
+    Checks if the file is a legacy ClrMamePro (CMP) DAT file.
+    Reads the first few lines to find the 'clrmamepro (' signature.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            head = f.read(100) # First 100 characters are enough
+            return "clrmamepro" in head.lower()
+    except:
+        return False
+
+def parse_cmp_dat_file(file_path: str) -> List[Tuple]:
+    """
+    Parses a legacy CMP format DAT file using Regex.
+    Returns a list of tuples compatible with the main DB schema.
+    """
+    rows = []
+    dat_filename = os.path.basename(file_path)
+    
+    try:
+        system_name = os.path.basename(os.path.dirname(file_path))
+    except:
+        system_name = "Unknown"
+    
+    # CMP format is plain text, so we read the whole file and parse with Regex.
+    # In larger files, line-by-line reading can be implemented to avoid memory issues,
+    # but CMP files are usually small (metadata), so we use read() for speed.
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+    except Exception as e:
+        logging.error(f"FAILED (Read CMP): {file_path} -> {e}")
+        return []
+
+    game_blocks = []
+    iterator = re.finditer(r'game\s*\(', content, re.IGNORECASE)
+    
+    for match in iterator:
+        start_idx = match.end()
+        current_idx = start_idx
+        balance = 1 # Açık parantez sayısı (game'in kendisi)
+        
+        while balance > 0 and current_idx < len(content):
+            char = content[current_idx]
+            if char == '(':
+                balance += 1
+            elif char == ')':
+                balance -= 1
+            current_idx += 1
+            
+        if balance == 0:
+            # Tam bloğu yakaladık (son parantez hariç)
+            block_content = content[start_idx : current_idx - 1]
+            game_blocks.append(block_content)
+            
+    
+    # Regex Patterns
+    
+    # Blok içindeki özellikleri bul (name "Değer")
+    # Find properties inside game block
+    name_pattern = re.compile(r'name\s+"(.*?)"', re.IGNORECASE)
+    desc_pattern = re.compile(r'description\s+"(.*?)"', re.IGNORECASE)
+    
+    # ROM data 
+    rom_pattern = re.compile(r'rom\s*\(\s*(.*?)\s*\)', re.DOTALL | re.IGNORECASE)
+    # Details inside rom block
+    rom_name_pat = re.compile(r'name\s+"(.*?)"', re.IGNORECASE)
+    size_pat = re.compile(r'size\s+(\d+)', re.IGNORECASE)
+    crc_pat = re.compile(r'crc\s+([0-9a-fA-F]+)', re.IGNORECASE)
+    md5_pat = re.compile(r'md5\s+([0-9a-fA-F]+)', re.IGNORECASE)
+    sha1_pat = re.compile(r'sha1\s+([0-9a-fA-F]+)', re.IGNORECASE)
+
+    platform = dat_filename.split(' - ')[0]
+
+    for game_block in game_blocks:
+        g_name_match = name_pattern.search(game_block)
+        g_desc_match = desc_pattern.search(game_block)
+        
+        game_name = g_name_match.group(1) if g_name_match else "Unknown"
+        description = g_desc_match.group(1) if g_desc_match else game_name
+        
+        for rom_match in rom_pattern.finditer(game_block):
+            rom_block = rom_match.group(1)
+            
+            r_name = rom_name_pat.search(rom_block)
+            r_size = size_pat.search(rom_block)
+            r_crc = crc_pat.search(rom_block)
+            r_md5 = md5_pat.search(rom_block)
+            r_sha1 = sha1_pat.search(rom_block)
+            
+            if r_name:
+                rows.append((
+                    dat_filename,
+                    platform,
+                    game_name,
+                    description,
+                    r_name.group(1),
+                    int(r_size.group(1)) if r_size else 0,
+                    r_crc.group(1) if r_crc else "",
+                    r_md5.group(1) if r_md5 else "",
+                    r_sha1.group(1) if r_sha1 else "",
+                    "good",
+                    system_name
+                ))
+
+    return rows
         
 def main():
 
@@ -303,7 +427,7 @@ def main():
             print(f"Scanning directory: {args.input}...")
             all_dat_files = get_dat_files(args.input)
             count_files = len(all_dat_files)
-            print(f"📄 A total of {count_files} .dat files were found.")
+            print(f"  A total of {count_files} .dat files were found.")
 
             if not all_dat_files:
                 print("No .dat file found. Exiting.")
@@ -374,7 +498,7 @@ def main():
                 files_to_process = all_dat_files
             else:
                 # Resume mode: skip already processed files
-                print("🔍 Calculating resume list...")
+                print("  Calculating resume list...")
                 result = conn.execute("SELECT filename FROM processed_files").fetchall()
                 processed_set = {row[0] for row in result}
                 
@@ -397,8 +521,6 @@ def main():
             total_bytes = sum(os.path.getsize(f) for f in all_dat_files)
             remaining_bytes = sum(os.path.getsize(f) for f in files_to_process)
             initial_bytes = total_bytes - remaining_bytes
-
-            print(f"  Starting import with {args.workers} worker(s)...")
 
             total_roms = 0
             error_count = 0
@@ -442,7 +564,7 @@ def main():
                 if args.workers < 2:
                     for file_path in files_to_process:
                         try:
-                            data = parse_dat_file(file_path)
+                            data = parse_xml_dat_file(file_path)
                             if data:
                                 buffer.extend(data)
                                 if len(buffer) >= args.batch_size:
@@ -468,7 +590,7 @@ def main():
                     # Workers parse XML, Main Thread writes to DB.
                     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
                         # Submit all tasks
-                        future_to_file = {executor.submit(parse_dat_file, f): f for f in files_to_process}
+                        future_to_file = {executor.submit(parse_xml_dat_file, f): f for f in files_to_process}
                         
                         # Process results as they complete
                         for future in concurrent.futures.as_completed(future_to_file):
