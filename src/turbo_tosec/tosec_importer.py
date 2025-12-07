@@ -49,7 +49,7 @@ import concurrent.futures
 import logging
 import subprocess
 import platform
-from turbo_tosec._version import __version__
+from _version import __version__
 
 
 def setup_logging(log_file: str):
@@ -567,7 +567,7 @@ def main():
                 if args.workers < 2:
                     for file_path in files_to_process:
                         try:
-                            data = parse_xml_dat_file(file_path)
+                            data = parse_dat_file(file_path)
                             if data:
                                 buffer.extend(data)
                                 if len(buffer) >= args.batch_size:
@@ -593,7 +593,7 @@ def main():
                     # Workers parse XML, Main Thread writes to DB.
                     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
                         # Submit all tasks
-                        future_to_file = {executor.submit(parse_xml_dat_file, f): f for f in files_to_process}
+                        future_to_file = {executor.submit(parse_dat_file, f): f for f in files_to_process}
                         
                         # Process results as they complete
                         for future in concurrent.futures.as_completed(future_to_file):
