@@ -40,17 +40,14 @@ import sys
 from datetime import datetime
 import time
 import argparse
-import xml.etree.ElementTree as ET
-from typing import List, Tuple, Optional
-import duckdb
-from tqdm import tqdm 
-import threading
-import concurrent.futures
 import logging
 import subprocess
 import platform
-from turbo_tosec._version import __version__
 
+from turbo_tosec.database import DatabaseManager
+from turbo_tosec.session import ImportSession
+from turbo_tosec.utils import get_dat_files
+from turbo_tosec._version import __version__
 
 def setup_logging(log_file: str):
    
@@ -72,47 +69,8 @@ def open_file_with_default_app(filepath):
         else: # Linux
             subprocess.call(('xdg-open', filepath))
     except Exception as e:
-        print(f"\n  Could not open log file automatically: {e}")
+        print(f"\nCould not open log file automatically: {e}")
         
-def create_database(db_path: str):
-    
-    conn = duckdb.connect(db_path)
-    
-    # Main ROMs table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS roms (
-            dat_filename VARCHAR,
-            platform VARCHAR,
-            game_name VARCHAR,
-            description VARCHAR,
-            rom_name VARCHAR,
-            size BIGINT,
-            crc VARCHAR,
-            md5 VARCHAR,
-            sha1 VARCHAR,
-            status VARCHAR,
-            system VARCHAR
-        )
-    """)
-    
-    # Processed files tracking table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS processed_files (
-            filename VARCHAR PRIMARY KEY,
-            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    # Metadata table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS db_metadata (
-            key VARCHAR PRIMARY KEY,
-            value VARCHAR
-        )
-    """)
-    
-    return conn
-
 def extract_tosec_version(path: str) -> str:
     # Example pattern: TOSEC-v2023-08-15
     match = re.search(r"(TOSEC-v\d{4}-\d{2}-\d{2})", path, re.IGNORECASE)
@@ -120,212 +78,119 @@ def extract_tosec_version(path: str) -> str:
         return match.group(1)
     return "Unknown"
 
-def get_dat_files(root_dir: str) -> List[str]:
+def run_scan_mode(args):
+    """
+    Orchestrates the scanning process using the new OOP architecture.
+    """
+    # 1. Setting up logging
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs("logs", exist_ok=True)
+    log_filename = os.path.join("logs", f"tosec_import_log_{timestamp}.log")
+    setup_logging(log_filename)
     
-    dat_files = []
+    start_time = time.time()
     
-    for root, _, files in os.walk(root_dir):
-        for file in files:
-            if file.lower().endswith(".dat"):
-                dat_files.append(os.path.join(root, file))
-    return dat_files
+    # 2. Scan for .dat files
+    print(f"Scanning directory: {args.input}...")
+    all_dat_files = get_dat_files(args.input)
+    
+    if not all_dat_files:
+        print("No .dat files found. Exiting.")
+        return
 
-def parse_dat_file(file_path: str) -> List[Tuple]:
-    """
-    Main entry point for parsing. Detects format (XML vs CMP) and dispatches.
-    """
-    # Look at file type first
-    if _is_cmp_file(file_path):
-        # CMP (Legacy) Formatı
-        try:
-            return parse_cmp_dat_file(file_path)
-        except Exception as e:
-            logging.error(f"FAILED (CMP Parse): {file_path} -> {e}")
-            return []
+    # 3. Detect TOSEC Version
+    current_version = extract_tosec_version(args.input)
+    print(f"Detected Input Version: {current_version}")
+
+    # Database Context Manager for safe handling (auto connect/close)
+    with DatabaseManager(args.output) as db:
+        
+        # Resume / Wipe Decision Logic
+        resume_mode = False
+        db_version = db.get_metadata_value('tosec_version')
+        
+        # A. Version Mismatch Check
+        if db_version and db_version != current_version:
+            print(f"\nWARNING: Version Mismatch! (DB: {db_version} vs Input: {current_version})")
+            
+            if args.force_new:
+                print("--force-new detected. Wiping old database.")
+                resume_mode = False
+            else:
+                q = input("Start FRESH and wipe old database? (Required for new version) [y/N]: ").lower()
+                if q != 'y': 
+                    print("Operation aborted.")
+                    return
+                resume_mode = False
+        
+        # B. Version is compatible, ask about resuming
+        else:
+            processed_files = db.get_processed_files()
+            if processed_files:
+                if args.resume:
+                    resume_mode = True
+                elif args.force_new:
+                    resume_mode = False
+                else:
+                    print(f"\nFound {len(processed_files)} processed files.")
+                    q = input("[R]esume or [S]tart fresh? [R/s]: ").lower()
+                    resume_mode = (q != 's')
+        
+        files_to_process = []
+        
+        if not resume_mode:
+            #Start from scratch
+            print("Wiping database...")
+            db.wipe_database()
+            db.set_metadata_value('tosec_version', current_version)
+            files_to_process = all_dat_files
+        else:
+            # Resume from last state
+            print("Calculating resume list...")
+            processed_set = db.get_processed_files()
+            files_to_process = [f for f in all_dat_files if os.path.basename(f) not in processed_set]
+            
+            skipped = len(all_dat_files) - len(files_to_process)
+            print(f"Resuming: {skipped} files skipped. {len(files_to_process)} remaining.")
+
+        if not files_to_process:
+            print("Nothing to do. All files processed.")
+            return
+
+        db.configure_threads(args.workers)
+        
+        session = ImportSession(args, db, all_dat_files)
+        total_roms, error_count = session.run(files_to_process)
+
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    print("\nTransaction completed!")
+    print(f"Database: {args.output}")
+    print(f"Total ROMs: {total_roms:,}")
+    print(f"Elapsed Time: {duration:.2f}s")
+    
+    if error_count > 0:
+        print(f"\nWARNING: {error_count} files failed.")
+        if args.open_log: 
+            open_file_with_default_app(log_filename)
     else:
-        # Starndard XML Format (Default)
-        return parse_xml_dat_file(file_path)
-    
-def parse_xml_dat_file(file_path: str) -> List[Tuple]:
-   
-    print("Reading from xml file...")
-    rows = []
-    dat_filename = os.path.basename(file_path)
-    try:
-        system_name = os.path.basename(os.path.dirname(file_path))
-    except:
-        system_name = "Unknown"
+        logging.shutdown()
+        if os.path.exists(log_filename): 
+            try: os.remove(log_filename)
+            except: pass
+        print("Clean import.")
 
-    platform = dat_filename.split(' - ')[0]
-
-    tree = ET.parse(file_path)
-    root = tree.getroot()
-    
-    for game in root.findall('game'):
-        game_name = game.get('name')
-        # Description may be missing sometimes, take it safe
-        desc_node = game.find('description')
-        description = desc_node.text if desc_node is not None else ""
-        
-        for rom in game.findall('rom'):
-            rows.append((dat_filename, platform, game_name, description, 
-                         rom.get('name'), rom.get('size'), rom.get('crc'), rom.get('md5'), 
-                         rom.get('sha1'), rom.get('status', 'good'), system_name))
-
-    return rows
-
-def export_to_parquet(db_path: str, parquet_path: str, threads: int = 1):
-    
-    if not os.path.exists(db_path):
-        print(f"  Database not found: {db_path}")
-        return
-
-    print(f"  Exporting database to Parquet: {parquet_path} (Threads: {threads})...")
-    start = time.time()
-    
-    try:
-        conn = duckdb.connect(db_path)
-        conn.execute(f"PRAGMA threads={threads}")
-        conn.execute(f"COPY roms TO '{parquet_path}' (FORMAT PARQUET, COMPRESSION 'SNAPPY')")
-        conn.close()
-        print(f"  Export completed in {time.time() - start:.2f}s")
-    except Exception as e:
-        print(f"  Export failed: {e}")
-
-def import_from_parquet(db_path: str, parquet_path: str, threads: int = 1):
-    
-    if not os.path.exists(parquet_path):
-        print(f"  Parquet file not found: {parquet_path}")
-        return
-
-    print(f"  Importing Parquet into database: {db_path} (Threads: {threads})...")
-    start = time.time()
-    
-    try:
-        conn = create_database(db_path) # Şemayı oluştur
-        conn.execute(f"PRAGMA threads={threads}")   
-        # Read Parquet and insert into table
-        conn.execute(f"INSERT INTO roms SELECT * FROM read_parquet('{parquet_path}')")
-        
-        # Statistics
-        count = conn.execute("SELECT count(*) FROM roms").fetchone()[0]
-        conn.close()
-        
-        print(f"  Import completed in {time.time() - start:.2f}s")
-        print(f"  Total Rows in DB: {count:,}")
-    except Exception as e:
-        print(f"  Import failed: {e}")
-        
-def _is_cmp_file(file_path: str) -> bool:
+def run_parquet_mode(args):
     """
-    Checks if the file is a legacy ClrMamePro (CMP) DAT file.
-    Reads the first few lines to find the 'clrmamepro (' signature.
+    Handles Parquet import/export operations.
     """
-    try:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            head = f.read(100) # First 100 characters are enough
-            return "clrmamepro" in head.lower()
-    except:
-        return False
+    with DatabaseManager(args.db) as db:
+        if args.export_file:
+            db.export_to_parquet(args.export_file, args.workers)
+        elif args.import_file:
+            db.import_from_parquet(args.import_file, args.workers)
 
-def parse_cmp_dat_file(file_path: str) -> List[Tuple]:
-    """
-    Parses a legacy CMP format DAT file using Regex.
-    Returns a list of tuples compatible with the main DB schema.
-    """
-    print("Reading from cmp file...")
-    
-    rows = []
-    dat_filename = os.path.basename(file_path)
-    
-    try:
-        system_name = os.path.basename(os.path.dirname(file_path))
-    except:
-        system_name = "Unknown"
-    
-    # CMP format is plain text, so we read the whole file and parse with Regex.
-    # In larger files, line-by-line reading can be implemented to avoid memory issues,
-    # but CMP files are usually small (metadata), so we use read() for speed.
-    try:
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read()
-    except Exception as e:
-        logging.error(f"FAILED (Read CMP): {file_path} -> {e}")
-        return []
-
-    game_blocks = []
-    iterator = re.finditer(r'game\s*\(', content, re.IGNORECASE)
-    
-    for match in iterator:
-        start_idx = match.end()
-        current_idx = start_idx
-        balance = 1 # Açık parantez sayısı (game'in kendisi)
-        
-        while balance > 0 and current_idx < len(content):
-            char = content[current_idx]
-            if char == '(':
-                balance += 1
-            elif char == ')':
-                balance -= 1
-            current_idx += 1
-            
-        if balance == 0:
-            # Tam bloğu yakaladık (son parantez hariç)
-            block_content = content[start_idx : current_idx - 1]
-            game_blocks.append(block_content)
-            
-    
-    # Regex Patterns
-    
-    # Blok içindeki özellikleri bul (name "Değer")
-    # Find properties inside game block
-    name_pattern = re.compile(r'name\s+"(.*?)"', re.IGNORECASE)
-    desc_pattern = re.compile(r'description\s+"(.*?)"', re.IGNORECASE)
-    
-    # ROM data 
-    rom_pattern = re.compile(r'rom\s*\(\s*(.*?)\s*\)', re.DOTALL | re.IGNORECASE)
-    # Details inside rom block
-    rom_name_pat = re.compile(r'name\s+"(.*?)"', re.IGNORECASE)
-    size_pat = re.compile(r'size\s+(\d+)', re.IGNORECASE)
-    crc_pat = re.compile(r'crc\s+([0-9a-fA-F]+)', re.IGNORECASE)
-    md5_pat = re.compile(r'md5\s+([0-9a-fA-F]+)', re.IGNORECASE)
-    sha1_pat = re.compile(r'sha1\s+([0-9a-fA-F]+)', re.IGNORECASE)
-
-    platform = dat_filename.split(' - ')[0]
-
-    for game_block in game_blocks:
-        g_name_match = name_pattern.search(game_block)
-        g_desc_match = desc_pattern.search(game_block)
-        
-        game_name = g_name_match.group(1) if g_name_match else "Unknown"
-        description = g_desc_match.group(1) if g_desc_match else game_name
-        
-        for rom_match in rom_pattern.finditer(game_block):
-            rom_block = rom_match.group(1)
-            
-            r_name = rom_name_pat.search(rom_block)
-            r_size = size_pat.search(rom_block)
-            r_crc = crc_pat.search(rom_block)
-            r_md5 = md5_pat.search(rom_block)
-            r_sha1 = sha1_pat.search(rom_block)
-            
-            if r_name:
-                rows.append((
-                    dat_filename,
-                    platform,
-                    game_name,
-                    description,
-                    r_name.group(1),
-                    int(r_size.group(1)) if r_size else 0,
-                    r_crc.group(1) if r_crc else "",
-                    r_md5.group(1) if r_md5 else "",
-                    r_sha1.group(1) if r_sha1 else "",
-                    "good",
-                    system_name
-                ))
-
-    return rows
-        
 def main():
 
     # Backward Compatibility Hack
@@ -373,10 +238,10 @@ def main():
  A high-performance, DuckDB-based importer for TOSEC DAT collections.
 
  ** SAFETY FIRST PHILOSOPHY
- This tool is designed to handle massive datasets without freezing your
+ turbo-tosec is designed to handle massive datasets without freezing your
  system. By default, it runs in **SINGLE-THREADED (SAFE) MODE**.
 
- We respect your hardware limits. We do not auto-detect your CPU cores
+ This tool respects your hardware limits. It does not auto-detect your CPU cores
  to prevent system unresponsiveness during large imports.
 
  ** WANT SPEED? (TURBO MODE)
@@ -402,257 +267,17 @@ def main():
     
     try:
         if args.command == "parquet":
+            run_parquet_mode(args)
             
-            if args.export_file:
-                export_to_parquet(args.db, args.export_file, args.workers)
-            elif args.import_file:
-                import_from_parquet(args.db, args.import_file, args.workers)
-            return  # parquet subcommand used without any option
-        
         elif args.command == "scan":
-            
             if args.workers > 4:
                 print(f"  WARNING: Using {args.workers} threads.")
                 print("   If you are using a mechanical HDD, performance may drop due to seek time.")
                 print("   Recommended for HDD: 1-4 threads. Recommended for SSD: 4-16 threads.")
-        
             if not args.input:
                 parser.error("the following arguments are required: --input/-i")
                 
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            
-            os.makedirs("logs", exist_ok=True)
-            log_filename = os.path.join("logs", f"tosec_import_log_{timestamp}.log")
-            
-            setup_logging(log_filename)
-            start_time = time.time()
-            
-            print(f"Scanning directory: {args.input}...")
-            all_dat_files = get_dat_files(args.input)
-            count_files = len(all_dat_files)
-            print(f"  A total of {count_files} .dat files were found.")
-
-            if not all_dat_files:
-                print("No .dat file found. Exiting.")
-                return
-
-            current_version = extract_tosec_version(args.input)
-            print(f"Detected TOSEC version: {current_version}")
-            
-            db_exists = os.path.exists(args.output)
-            conn = create_database(args.output)
-
-            resume_mode = False
-            if db_exists:
-                # Check metadata for TOSEC version
-                stored_version = None
-                try:
-                    result = conn.execute("SELECT value FROM db_metadata WHERE key = 'tosec_version'").fetchone()
-                    if result:
-                        stored_version = result[0]
-                except:
-                    pass
-                
-                # Check version mismatch
-                if stored_version and stored_version != current_version:
-                    print(f"\n   WARNING: TOSEC version mismatch!")
-                    print(f"   Database belongs to: {stored_version}")
-                    print(f"   Input directory is:  {current_version}")
-                    print("   Mixing versions creates a corrupted archive.")
-                    
-                    q = input("  Start FRESH and wipe old database? (Required for new version) [y/N]: ").lower()
-                    if q != 'y':
-                        print("  Operation aborted to protect data.")
-                        conn.close()
-                        return
-                    # User agreed to wipe old DB
-                    print("  Wiping old database and starting FRESH import...")
-                    resume_mode = False
-                    
-                else:
-                    # Version matches or version unknown, resumable ?
-                    processed_count = conn.execute("SELECT COUNT(*) FROM processed_files").fetchone()[0]
-                    
-                    if processed_count > 0:
-                        # Flag Control 
-                        if args.resume:
-                            print(f"  --resume detected. Resuming import. ({processed_count} files already processed)")
-                            resume_mode = True
-                        elif args.force_new:
-                            print("  --force-new detected. Wiping old database.")
-                            resume_mode = False
-                    else:
-                        # Interactive Mode (Ask User)
-                        print(f"\nFound existing database with {processed_count} processed files.")
-                        q = input("  [R]esume interrupted import or [S]tart fresh? [R/s]: ").lower()
-                        resume_mode = q == 'r'
-                    
-            files_to_process = []
-            
-            if not resume_mode:
-                print("  Wiping database for fresh import...")
-                conn.execute("DELETE FROM roms")
-                conn.execute("DELETE FROM processed_files")
-                conn.execute("DELETE FROM db_metadata") # Reset metadata
-                
-                # Save current TOSEC version
-                conn.execute("INSERT INTO db_metadata VALUES ('tosec_version', ?)", (current_version,))
-                
-                files_to_process = all_dat_files
-            else:
-                # Resume mode: skip already processed files
-                print("  Calculating resume list...")
-                result = conn.execute("SELECT filename FROM processed_files").fetchall()
-                processed_set = {row[0] for row in result}
-                
-                # Take files not in processed_set
-                files_to_process = [f for f in all_dat_files if os.path.basename(f) not in processed_set]
-                
-                skipped_count = len(all_dat_files) - len(files_to_process)
-                print(f"  Resuming: {skipped_count} files skipped. {len(files_to_process)} remaining.")
-
-            if not files_to_process:
-                print("  All files are already processed! Nothing to do.")
-                conn.close()
-                return
-            
-            count_files = len(files_to_process) # for progress bar
-
-            print("📊 Calculating total size for progress bar...")
-            
-            # 1. Total size of all files (Target)
-            total_bytes = sum(os.path.getsize(f) for f in all_dat_files)
-            remaining_bytes = sum(os.path.getsize(f) for f in files_to_process)
-            initial_bytes = total_bytes - remaining_bytes
-
-            total_roms = 0
-            error_count = 0
-            if args.workers == 0: 
-                args.workers = os.cpu_count() or 1
-                
-            print(f"  Starting import with {args.workers} worker(s)...", flush=True)
-            
-            buffer = []
-            
-            def flush_buffer():
-                nonlocal total_roms
-                if buffer:
-                    conn.executemany("""INSERT INTO roms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", buffer)
-                    
-                    unique_files = {row[0] for row in buffer}
-                    
-                    for filename in unique_files:
-                        # Hata vermeden ekle (Varsa atla)
-                        # DuckDB'de 'INSERT OR IGNORE' yerine 'INSERT OR IGNORE INTO' çalışır
-                        conn.execute("INSERT OR IGNORE INTO processed_files (filename) VALUES (?)", (filename,))
-                    
-                    total_roms += len(buffer)
-                    buffer.clear()
-            
-            # Processing logic 
-            with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, unit_divisor=1024) as pbar:
-            
-                stop_monitor = threading.Event()
-                
-                def monitor_progress():
-                    while not stop_monitor.is_set():
-                        time.sleep(1)
-                        pbar.refresh()
-                        
-                monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
-                monitor_thread.start()
-                
-                # Serial Mode (by default)
-                # No overhead of threading, best for debugging or small tasks.
-                if args.workers < 2:
-                    for file_path in files_to_process:
-                        try:
-                            data = parse_dat_file(file_path)
-                            if data:
-                                buffer.extend(data)
-                                if len(buffer) >= args.batch_size:
-                                    flush_buffer()
-                        except Exception as exc:
-                            error_count += 1
-                            logging.error(f"FAILED: (Serial) {file_path} -> {exc}")
-                            
-                        stats = {"ROMs": total_roms}
-                        if error_count > 0:
-                            stats["Errors"] = error_count
-                        
-                        pbar.set_postfix(stats)
-                        
-                        try:
-                            f_size = os.path.getsize(file_path)
-                            pbar.update(f_size)
-                        except:
-                            pbar.update(0) # File deleted during processing?, etc..
-                            
-                else:
-                    # ### PARALLEL MODE (Turbo) ###
-                    # Workers parse XML, Main Thread writes to DB.
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-                        # Submit all tasks
-                        future_to_file = {executor.submit(parse_dat_file, f): f for f in files_to_process}
-                        
-                        # Process results as they complete
-                        for future in concurrent.futures.as_completed(future_to_file):
-                            file_path = future_to_file[future]
-                            try:
-                                data = future.result()
-                                if data:
-                                    buffer.extend(data)
-                                    # Batch write in Main Thread
-                                    if len(buffer) >= args.batch_size:
-                                        flush_buffer()
-                            except Exception as exc:
-                                error_count += 1
-                                logging.error(f"FAILED: {file_path} -> {exc}")
-                                
-                            stats = {"ROMs": total_roms}
-                            if error_count > 0:
-                                stats["Errors"] = error_count
-                            
-                            pbar.set_postfix(stats)
-                            
-                            try:
-                                f_size = os.path.getsize(file_path)
-                                pbar.update(f_size)
-                            except:
-                                pbar.update(0)
-            
-                stop_monitor.set()
-                monitor_thread.join()
-                
-            # Final flush for remaining items
-            flush_buffer()
-            conn.close()
-
-            end_time = time.time()
-            duration = end_time - start_time
-            
-            print("\n  Transaction completed!")
-            print(f"  Database: {args.output}")
-            print(f"  Total ROM: {total_roms:,}")  # Print with thousands separator
-            print(f"   Elapsed Time: {duration:.2f} second ({duration/60:.1f} minute)")
-
-            if error_count > 0:
-                print(f"\n   WARNING: {error_count} files could not be processed!")
-                print(f"  Details written to: {os.path.abspath(log_filename)}")
-                
-                if args.open_log: 
-                    print("launching log viewer...")
-                    open_file_with_default_app(log_filename)
-            else:
-                logging.shutdown()
-                
-                if os.path.exists(log_filename):
-                    try:
-                        os.remove(log_filename)
-                    except Exception as e:
-                        print(f"\n  Could not delete empty log file: {e}")
-                        
-                print("  Clean import. No errors.")
+            run_scan_mode(args)
 
     except KeyboardInterrupt:
         print("\n  Process interrupted by user.")
