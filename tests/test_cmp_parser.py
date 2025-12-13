@@ -1,5 +1,6 @@
 import os
-from turbo_tosec.tosec_importer import _is_cmp_file, parse_cmp_dat_file
+import pytest
+from turbo_tosec.parser import DatFileParser
 
 SAMPLE_CMP_CONTENT = """clrmamepro (
     name "Commodore 64 - Games"
@@ -20,7 +21,11 @@ game (
 )
 """
 
-def test_is_cmp_file_detection(tmp_path):
+@pytest.fixture
+def parser():
+    return DatFileParser()
+
+def test_is_cmp_file_detection(tmp_path, parser):
     """
     tests if _is_cmp_file correctly identifies a valid CMP file.
     """
@@ -33,10 +38,10 @@ def test_is_cmp_file_detection(tmp_path):
     xml_file.write_text("<?xml version='1.0'?><datafile>...</datafile>", encoding="utf-8")
 
     # 3. Test
-    assert _is_cmp_file(str(cmp_file)) is True
-    assert _is_cmp_file(str(xml_file)) is False
+    assert parser._is_cmp_file(str(cmp_file)) is True
+    assert parser._is_cmp_file(str(xml_file)) is False
 
-def test_cmp_parsing_logic(tmp_path):
+def test_cmp_parsing_logic(tmp_path, parser):
     """
     parse_cmp_dat_file fonksiyonunun veriyi doğru çekip çekmediğini test eder.
     """
@@ -45,7 +50,7 @@ def test_cmp_parsing_logic(tmp_path):
     dat_file.write_text(SAMPLE_CMP_CONTENT, encoding="utf-8")
     
     # 2. Call the function
-    results = parse_cmp_dat_file(str(dat_file))
+    results = parser._parse_cmp(str(dat_file))
     
     # 3 .Verify the results
     # Expected: 2 games (rows) should be returned

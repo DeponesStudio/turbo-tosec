@@ -1,7 +1,8 @@
 import os
 import pytest
 import duckdb
-from turbo_tosec.tosec_importer import parse_xml_dat_file, create_database
+from turbo_tosec.parser import DatFileParser
+from turbo_tosec.database import DatabaseManager
 from turbo_tosec._version import __version__
 
 SAMPLE_DAT_XML = """<?xml version="1.0"?>
@@ -17,7 +18,11 @@ SAMPLE_DAT_XML = """<?xml version="1.0"?>
 </datafile>
 """
 
-def test_platform_parsing(tmp_path):
+@pytest.fixture
+def parser():
+    return DatFileParser()
+
+def test_platform_parsing(tmp_path, parser):
     """
     XML parsing mantığını ve 'system' (klasör) adı çıkarma işlemini test eder.
     """
@@ -28,7 +33,7 @@ def test_platform_parsing(tmp_path):
     dat_file = dats_dir / filename
     dat_file.write_text(SAMPLE_DAT_XML, encoding="utf-8")
 
-    results = parse_xml_dat_file(str(dat_file))
+    results = parser.parse(str(dat_file))
 
     assert len(results) == 1, "Parser should have found exactly 1 game"
     
@@ -40,15 +45,16 @@ def test_platform_parsing(tmp_path):
 def test_database_integration(tmp_path):
    
     db_path = str(tmp_path / "test.duckdb")
-    conn = create_database(db_path)
     
-    mock_data = [
-        ("Amiga.dat", "Commodore Amiga", "Game X", "Desc", "rom.adf", 500, "c", "m", "s", "good", "folder")
-    ]
-    
-    conn.executemany("INSERT INTO roms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mock_data)
-    
-    res = conn.execute("SELECT platform FROM roms").fetchone()
-    assert res[0] == "Commodore Amiga"
-    
-    conn.close()
+    with DatabaseManager(db_path) as db:
+        # Sahte veri
+        mock_data = [
+            ("Amiga.dat", "Commodore Amiga", "Game X", "Desc", "rom.adf", 500, "c", "m", "s", "good", "folder")
+        ]
+        
+        # Yazma işlemi (Batch Insert)
+        db.insert_batch(mock_data)
+        
+        # Okuma işlemi (Doğrudan connection üzerinden)
+        res = db.conn.execute("SELECT platform FROM roms").fetchone()
+        assert res[0] == "Commodore Amiga"
