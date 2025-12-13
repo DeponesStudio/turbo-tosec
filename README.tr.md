@@ -104,6 +104,14 @@ WHERE platform LIKE '%Commodore 64%'
 SELECT * FROM roms WHERE md5 = 'DOSYANIZIN_MD5_HASH_DEGERI';
 ```
 
+## 📚 Dokümantasyon & Wiki
+
+Dokümantasyon için **[Proje Wikisi](https://github.com/berkacunas/turbo-tosec/wiki)** sayfasına bakınız:
+
+* 🚀 **[Başlangıç Rehberi](https://github.com/berkacunas/turbo-tosec/wiki/Getting-Started):** Kurulum ve ilk tarama rehberi.
+* 🔧 **[CLI Referansı](https://github.com/berkacunas/turbo-tosec/wiki/CLI-Reference):** Komut ve parametrelerin detaylı açıklamaları.
+* 🍳 **[SQL Yemek Kitabı](https://github.com/berkacunas/turbo-tosec/wiki/SQL-Cookbook):** DBeaver ile koleksiyonunuzu sorgulamak için SQL örnekleri.
+
 ## 📄 Lisans
 
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.

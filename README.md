@@ -102,6 +102,14 @@ WHERE platform LIKE '%Commodore 64%'
 SELECT * FROM roms WHERE md5 = 'YOUR_FILE_MD5_HASH_HERE';
 ```
 
+## 📚 Documentation & Wiki
+
+For detailed guides, please refer to the Project Wiki: **[Project Wiki](https://github.com/berkacunas/turbo-tosec/wiki)
+
+* 🚀 **[Getting Started](https://github.com/berkacunas/turbo-tosec/wiki/Getting-Started):** Step-by-step guide from downloading DATs to your first scan.
+* 🔧 **[CLI Reference](https://github.com/berkacunas/turbo-tosec/wiki/CLI-Reference):** Detailed explanation of all commands and flags.
+* 🍳 **[SQL Cookbook](https://github.com/berkacunas/turbo-tosec/wiki/SQL-Cookbook):** Ready-to-use SQL recipes to query your collection with DBeaver.
+
 ## 📄 License
 
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
