@@ -38,7 +38,7 @@ class DatabaseManager:
         
         
         if self.config.turbo:
-            print("DB: Turbo Mode engaged (Low safety, High speed) | Mem: {self.config.memory} | Threads: {self.config.threads}")
+            print(f"DB: Turbo Mode engaged (Low safety, High speed) | Mem: {self.config.memory} | Threads: {self.config.threads}")
             
             # Memory Configuration
             final_mem = self.config.memory
@@ -110,10 +110,14 @@ class DatabaseManager:
             return set()
 
     def wipe_database(self):
-        """Clears all data but keeps the file."""
-        self.conn.execute("DELETE FROM roms")
-        self.conn.execute("DELETE FROM processed_files")
-        self.conn.execute("DELETE FROM db_metadata")
+        """Clears all data but keeps the file structure."""
+        try:
+            self.conn.execute("DELETE FROM roms")
+            self.conn.execute("DELETE FROM processed_files")
+            self.conn.execute("DELETE FROM db_metadata")
+            self.conn.execute("VACUUM")
+        except Exception as error:
+            print(f"Error wiping database: {error}")
 
     def insert_batch(self, buffer: List[Tuple]):
         """Inserts a batch of ROMs and marks their files as processed."""
@@ -178,7 +182,15 @@ class DatabaseManager:
 
     def _get_optimal_ram_limit(self):
         """Calculates 75% of total RAM in GB, working on both Windows and Linux."""
+        if limit_str == "auto":
+            limit_str = "75%"
+
+        # Eğer zaten "16GB" gibi bir değer geldiyse doğrudan döndür
+        if "%" not in limit_str:
+            return limit_str
+
         try:
+            percent = int(limit_str.replace("%", "")) / 100.0
             total_ram_bytes = 0
             
             # for Windows
@@ -220,3 +232,18 @@ class DatabaseManager:
         except Exception as error:
             print(f"RAM detection failed ({error}), defaulting to 2GB.")
             return "2GB"
+        
+    def get_metadata_value(self, key: str) -> Optional[str]:
+        """Fetches a value from the metadata table safely."""
+        try:
+            result = self.conn.execute("SELECT value FROM db_metadata WHERE key=?", (key, )).fetchone()
+            return result[0] if result else None
+        except:
+            return None
+
+    def set_metadata_value(self, key: str, value: str):
+        """Sets or updates a metadata key."""
+        self.conn.execute("INSERT OR REPLACE INTO db_metadata VALUES (?, ?)", (key, value))
+        
+    def get_appender(self, table_name):
+        return self.conn.cursor().appender(table_name)
