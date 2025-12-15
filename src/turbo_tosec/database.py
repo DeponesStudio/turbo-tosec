@@ -180,7 +180,7 @@ class DatabaseManager:
         if thread_count > 0:
             self.conn.execute(f"PRAGMA threads={thread_count}")
 
-    def _get_optimal_ram_limit(self):
+    def _get_optimal_ram_limit(self, limit_str):
         """Calculates 75% of total RAM in GB, working on both Windows and Linux."""
         if limit_str == "auto":
             limit_str = "75%"
