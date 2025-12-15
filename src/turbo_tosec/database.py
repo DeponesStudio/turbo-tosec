@@ -8,9 +8,10 @@ class DatabaseManager:
     Manages DuckDB connection, schema creation, and data insertion.
     Encapsulates all SQL logic to keep the main flow clean.
     """
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, turbo_mode: bool = False):
         
         self.db_path = db_path
+        self.turbo_mode = turbo_mode
         self.conn = None
         
     def __enter__(self):
@@ -25,15 +26,15 @@ class DatabaseManager:
     def connect(self):
         """Establishes connection and ensures schema exists."""
         self.conn = duckdb.connect(self.db_path)
-        
-        # TURBO MODE SETTINGS
-        # 1. synchronous=OFF: Does not wait for disk to confirm "I wrote it" (Risky but very fast).
-        # self.conn.execute("PRAGMA synchronous=OFF") 
-        # 2. jounnal_mode=WAL: Does not lock reading during writing (Concurrency booster).
         self.conn.execute("PRAGMA journal_mode=WAL")
-        # 3. Memory Limit: Allow using RAM to the max.
-        # self.conn.execute("PRAGMA memory_limit='16GB'") 
         
+        if self.turbo_mode:
+            # synchronous=OFF: Does not wait for disk to confirm "I wrote it" (Risky but very fast).
+            self.conn.execute("PRAGMA synchronous=OFF")
+            self.conn.execute("PRAGMA memory_limit='75%'")
+        else:
+            self.conn.execute("PRAGMA synchronous=FULL")
+            
         self._setup_schema()
         
     def close(self):

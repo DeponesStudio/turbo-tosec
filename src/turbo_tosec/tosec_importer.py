@@ -95,12 +95,14 @@ def run_scan_mode(args, log_filename: str):
         print("No .dat files found. Exiting.")
         return
 
+    enable_turbo = (args.workers > 1)
+    
     # 3. Detect TOSEC Version
     current_version = extract_tosec_version(args.input)
     print(f"Detected Input Version: {current_version}")
 
     # Database Context Manager for safe handling (auto connect/close)
-    with DatabaseManager(args.output) as db:
+    with DatabaseManager(args.output, enable_turbo) as db:
         
         # Resume / Wipe Decision Logic
         resume_mode = False
