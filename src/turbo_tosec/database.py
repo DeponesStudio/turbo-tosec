@@ -4,16 +4,23 @@ import platform
 import ctypes
 from typing import List, Tuple, Optional
 import duckdb
+from typing import NamedTuple
 
+class DBConfig(NamedTuple):
+    memory: str = "4GB"
+    threads: int = 1
+    turbo: bool = False
+    
 class DatabaseManager:
     """
     Manages DuckDB connection, schema creation, and data insertion.
     Encapsulates all SQL logic to keep the main flow clean.
     """
-    def __init__(self, db_path: str, turbo_mode: bool = False):
+    def __init__(self, db_path: str, config: DBConfig = None):
         
         self.db_path = db_path
-        self.turbo_mode = turbo_mode
+        # If config is None use default config
+        self.config = config or DBConfig()
         self.conn = None
         
     def __enter__(self):
@@ -29,12 +36,20 @@ class DatabaseManager:
         """Establishes connection and ensures schema exists."""
         self.conn = duckdb.connect(self.db_path)
         
-        if self.turbo_mode:
-            print("DB: Turbo Mode engaged (Low safety, High speed)")
-            ram_limit = self._get_optimal_ram_limit()
-            self.conn.execute(f"PRAGMA memory_limit='{ram_limit}'")
+        
+        if self.config.turbo:
+            print("DB: Turbo Mode engaged (Low safety, High speed) | Mem: {self.config.memory} | Threads: {self.config.threads}")
+            
+            # Memory Configuration
+            final_mem = self.config.memory
+            if "%" in final_mem or final_mem == "auto":
+                final_mem = self._get_optimal_ram_limit(final_mem)
+                
+            self.conn.execute(f"PRAGMA memory_limit='{final_mem}'")
+            self.conn.execute(f"PRAGMA threads={self.config.threads}")
+            
         else:
-            print("DB: Safe Mode engaged (Full integrity)")
+            print("DB Config: Safe Mode engaged (Full integrity)")
             
         self._setup_schema()
     

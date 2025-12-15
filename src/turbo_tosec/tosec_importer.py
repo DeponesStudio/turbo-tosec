@@ -44,7 +44,7 @@ import logging
 import subprocess
 import platform
 
-from turbo_tosec.database import DatabaseManager
+from turbo_tosec.database import DatabaseManager, DBConfig
 from turbo_tosec.session import ImportSession
 from turbo_tosec.utils import get_dat_files
 from turbo_tosec._version import __version__
@@ -78,6 +78,27 @@ def extract_tosec_version(path: str) -> str:
         return match.group(1)
     return "Unknown"
 
+def check_system_resources(workers, db_threads):
+    """
+    Checks system limits and warns if the configuration might cause bottlenecks.
+    """
+    try:
+        cpu_count = os.cpu_count() or 1
+        total_requested_threads = workers * db_threads
+        
+        print(f"System Resources: {cpu_count} CPU Cores detected.")
+        
+        if total_requested_threads > cpu_count:
+            print(f"WARNING: You requested {total_requested_threads} concurrent threads ({workers} workers x {db_threads} db_threads).")
+            print(f"    Your system only has {cpu_count} cores.")
+            print("    -> This may cause 'Context Switching' overhead and SLOW DOWN the process.")
+            print("    -> Recommendation: Keep (workers * db_threads) <= CPU Cores.")
+        else:
+            print(f"Configuration looks good: {total_requested_threads} threads <= {cpu_count} cores.")
+            
+    except Exception as e:
+        print(f"⚠️  Resource check skipped: {e}")
+        
 def run_scan_mode(args, log_filename: str):
     """
     Orchestrates the scanning process using the new OOP architecture.
@@ -101,8 +122,9 @@ def run_scan_mode(args, log_filename: str):
     current_version = extract_tosec_version(args.input)
     print(f"Detected Input Version: {current_version}")
 
+    db_config = DBConfig(turbo=(args.workers > 1), memory=args.db_memory, threads=args.db_threads)
     # Database Context Manager for safe handling (auto connect/close)
-    with DatabaseManager(args.output, enable_turbo) as db:
+    with DatabaseManager(args.output, config=db_config) as db:
         
         # Resume / Wipe Decision Logic
         resume_mode = False
@@ -224,6 +246,10 @@ def main():
     group = parser_parquet.add_mutually_exclusive_group(required=True)
     group.add_argument("--import-file", "-i", help="Import FROM this Parquet file.")
     group.add_argument("--export-file", "-o", help="Export TO this Parquet file.")
+    
+    # Advanced Performance Tuning
+    parser.add_argument("--db-memory", type=str, default="75%", help="DuckDB memory limit (e.g., '8GB', '75%%'). Default: 75%% of RAM.")
+    parser.add_argument("--db-threads", type=int, default=1, help="DuckDB threads per worker process. Default: 1 (Best for bulk insert).")
     
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
