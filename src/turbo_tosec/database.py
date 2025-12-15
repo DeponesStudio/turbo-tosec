@@ -25,6 +25,15 @@ class DatabaseManager:
     def connect(self):
         """Establishes connection and ensures schema exists."""
         self.conn = duckdb.connect(self.db_path)
+        
+        # TURBO MODE SETTINGS
+        # 1. synchronous=OFF: Does not wait for disk to confirm "I wrote it" (Risky but very fast).
+        # self.conn.execute("PRAGMA synchronous=OFF") 
+        # 2. jounnal_mode=WAL: Does not lock reading during writing (Concurrency booster).
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        # 3. Memory Limit: Allow using RAM to the max.
+        # self.conn.execute("PRAGMA memory_limit='16GB'") 
+        
         self._setup_schema()
         
     def close(self):

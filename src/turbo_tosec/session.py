@@ -5,9 +5,17 @@ import concurrent.futures
 import time
 from tqdm import tqdm
 import logging
+import multiprocessing
 
 from turbo_tosec.database import DatabaseManager
 from turbo_tosec.parser import DatFileParser
+
+def worker_parse_task(file_path: str) -> List[Tuple]:
+    """
+    Worker process entry point. Creates its own parser instance to avoid pickling issues.
+    """
+    parser = DatFileParser()
+    return parser.parse(file_path)
 
 def get_dat_files(root_dir: str) -> List[str]:
     """
@@ -29,11 +37,11 @@ class ImportSession:
         
         self.args = args
         self.db = db_manager
-        self.parser = DatFileParser()
         self.buffer = []
         self.total_roms = 0
         self.error_count = 0
         self.all_files = all_files
+        self.stop_monitor = threading.Event()
 
     def run(self, files_to_process: List[str]):
         """
@@ -43,14 +51,17 @@ class ImportSession:
         total_bytes = sum(os.path.getsize(f) for f in self.all_files)
         remaining_bytes = sum(os.path.getsize(f) for f in files_to_process)
         initial_bytes = total_bytes - remaining_bytes
-        print(f"Starting import with {self.args.workers} worker(s)...")
+        
+        # Check CPU core count to not exceed (ProcessPool consumes resources)
+        max_cpu = multiprocessing.cpu_count()
+        workers = min(self.args.workers, max_cpu) if self.args.workers > 0 else max_cpu
+        print(f"Starting import with {workers} process worker(s)...")
 
         try:
             with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, unit_divisor=1024) as pbar:
                 # Monitör Thread
-                stop_monitor = threading.Event()
                 def monitor_progress():
-                    while not stop_monitor.is_set():
+                    while not self.stop_monitor.is_set():
                         time.sleep(1)
                         pbar.refresh()
                 
@@ -58,12 +69,12 @@ class ImportSession:
                 monitor_thread.start()
 
                 # Start workers
-                if self.args.workers < 2:
+                if workers < 2:
                     self._run_serial(files_to_process, pbar)
                 else:
-                    self._run_parallel(files_to_process, pbar)
+                    self._run_parallel(files_to_process, workers, pbar)
 
-                stop_monitor.set()
+                self.stop_monitor.set()
                 monitor_thread.join()
 
             self._flush_buffer() # Write any remaining data
@@ -103,25 +114,23 @@ class ImportSession:
 
     def _run_serial(self, files, pbar):
         
+        parser = DatFileParser()
         for file_path in files:
             try:
-                data = self.parser.parse(file_path)
+                data = parser.parse(file_path)
                 self._process_result(data, file_path, pbar)
                 
             except Exception as error:
-                error_msg = str(error).lower()
-                # If disk is full or read-only, stop the program
-                if "not enough space" in error_msg or "read-only file system" in error_msg:
-                    raise OSError("CRITICAL: Disk is full or not writable!") from error
-                
-                self.error_count += 1
-                logging.error(f"Failed (Serial): {file_path} -> {error}")
+                self._handle_error(error, file_path)
 
-    def _run_parallel(self, files, pbar):
+    def _run_parallel(self, files, workers, pbar):
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.workers) as executor:
-            # parser.parse method is thread-safe (stateless)
-            future_to_file = {executor.submit(self.parser.parse, f): f for f in files}
+        # chunk_size: How many files to assign to each worker at a time?
+        # If too small, communication overhead increases; if too large, load balancing suffers.
+        chunk_size = max(1, len(files) // (workers * 4))
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+            future_to_file = {executor.submit(worker_parse_task, f): f for f in files}
             
             for future in concurrent.futures.as_completed(future_to_file):
                 file_path = future_to_file[future]
@@ -130,12 +139,19 @@ class ImportSession:
                     self._process_result(data, file_path, pbar)
                     
                 except Exception as error:
-                    error_msg = str(error).lower()
-                    # If disk is full or read-only, stop the program
-                    if "not enough space" in error_msg or "read-only file system" in error_msg:
-                        # Try to shut down the thread pool immediately
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise OSError("CRITICAL: Disk is full or not writable!") from error
-                
-                    self.error_count += 1
-                    logging.error(f"Failed: {file_path} -> {error}")
+                    self._handle_error(error, file_path)
+                    
+    def _handle_error(self, error, file_path):
+        
+        error_msg = str(error).lower()
+        if "not enough space" in error_msg or "read-only file system" in error_msg:
+             raise OSError("CRITICAL: Disk is full or not writable!") from error
+         
+        self.stop_monitor.set()
+        
+        if self.executor:
+            print("Shutting down executor immediately...")
+            self.executor.shutdown(wait=False, cancel_futures=True)
+        
+        self.error_count += 1
+        logging.error(f"Failed: {file_path} -> {error}")
