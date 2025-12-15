@@ -30,11 +30,9 @@ class DatabaseManager:
         if self.turbo_mode:
             print("DB: Turbo Mode engaged (Low safety, High speed)")
             # synchronous=OFF: Does not wait for disk to confirm "I wrote it" (Risky but very fast).
-            self.conn.execute("PRAGMA synchronous=OFF")
             self.conn.execute("PRAGMA memory_limit='75%'")
         else:
             print("DB: Safe Mode engaged (Full integrity)")
-            self.conn.execute("PRAGMA synchronous=FULL")
             
         self._setup_schema()
             
