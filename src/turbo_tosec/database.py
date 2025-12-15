@@ -26,7 +26,6 @@ class DatabaseManager:
     def connect(self):
         """Establishes connection and ensures schema exists."""
         self.conn = duckdb.connect(self.db_path)
-        self.conn.execute("PRAGMA journal_mode=WAL")
         
         if self.turbo_mode:
             print("DB: Turbo Mode engaged (Low safety, High speed)")
