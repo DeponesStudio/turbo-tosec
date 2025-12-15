@@ -1,5 +1,7 @@
 import os
 import time
+import platform
+import ctypes
 from typing import List, Tuple, Optional
 import duckdb
 
@@ -29,12 +31,13 @@ class DatabaseManager:
         
         if self.turbo_mode:
             print("DB: Turbo Mode engaged (Low safety, High speed)")
-            self.conn.execute("PRAGMA memory_limit='75%'")
+            ram_limit = self._get_optimal_ram_limit()
+            self.conn.execute(f"PRAGMA memory_limit='{ram_limit}'")
         else:
             print("DB: Safe Mode engaged (Full integrity)")
             
         self._setup_schema()
-            
+    
     def close(self):
         """Closes the database connection safely."""
         if self.conn:
@@ -157,3 +160,48 @@ class DatabaseManager:
         """Sets the PRAGMA threads for DuckDB."""
         if thread_count > 0:
             self.conn.execute(f"PRAGMA threads={thread_count}")
+
+    def _get_optimal_ram_limit(self):
+        """Calculates 75% of total RAM in GB, working on both Windows and Linux."""
+        try:
+            total_ram_bytes = 0
+            
+            # for Windows
+            if platform.system() == "Windows":
+                kernel32 = ctypes.windll.kernel32
+                c_ulonglong = ctypes.c_ulonglong
+                
+                class MEMORYSTATUSEX(ctypes.Structure):
+                    _fields_ = [
+                        ('dwLength', ctypes.c_ulong),
+                        ('dwMemoryLoad', ctypes.c_ulong),
+                        ('ullTotalPhys', c_ulonglong),
+                        ('ullAvailPhys', c_ulonglong),
+                        ('ullTotalPageFile', c_ulonglong),
+                        ('ullAvailPageFile', c_ulonglong),
+                        ('ullTotalVirtual', c_ulonglong),
+                        ('ullAvailVirtual', c_ulonglong),
+                        ('ullAvailExtendedVirtual', c_ulonglong),
+                    ]
+                
+                mem_status = MEMORYSTATUSEX()
+                mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+                kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status))
+                total_ram_bytes = mem_status.ullTotalPhys
+
+            # for Linux / Mac 
+            else:
+                if "SC_PAGE_SIZE" in os.sysconf_names and "SC_PHYS_PAGES" in os.sysconf_names:
+                    total_ram_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+            
+            if total_ram_bytes <= 0:
+                return "4GB"
+
+            limit_gb = int((total_ram_bytes * 0.75) / (1024**3))
+            limit_gb = max(1, limit_gb)
+            
+            return f"{limit_gb}GB"
+
+        except Exception as error:
+            print(f"RAM detection failed ({error}), defaulting to 2GB.")
+            return "2GB"
