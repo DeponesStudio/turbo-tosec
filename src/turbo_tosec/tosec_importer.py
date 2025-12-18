@@ -180,7 +180,7 @@ def run_scan_mode(args, log_filename: str):
 
         db.configure_threads(args.workers)
         
-        session = ImportSession(args, db, all_dat_files)
+        session = ImportSession(config=args, database=db, files=all_dat_files)
         total_roms, error_count = session.run(files_to_process)
 
     end_time = time.time()
@@ -235,6 +235,10 @@ def main():
     parser_scan.add_argument("--output", "-o", default="tosec.duckdb", help="Name/path of the DuckDB file to be created.")
     parser_scan.add_argument("--workers", "-w", type=int, default=1, help="Number of worker threads (Default: 1). Tip: Use 0 to auto-detect CPU count.")
     parser_scan.add_argument("--batch-size", "-b", type=int, default=1000, help="Number of rows to insert per batch transaction (Default: 1000).")
+    
+    parser_scan.add_argument("--streaming", action="store_true", help="Enable Low-Memory mode: Stream XML to temp Parquet files (Recommended for >5GB files).")
+    parser_scan.add_argument("--temp-dir", default="temp_chunks", help="Directory for temporary chunk files (used in streaming mode).")
+    
     parser_scan.add_argument("--resume", action="store_true", help="Automatically resume if database exists (skip prompt).")
     parser_scan.add_argument("--force-new", action="store_true", help="Force overwrite existing database (skip prompt).")
     parser_scan.add_argument("--no-open-log", action="store_false", dest="open_log", default=True, help="Do NOT automatically open the log file if errors occur.")

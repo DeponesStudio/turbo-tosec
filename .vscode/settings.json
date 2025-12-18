@@ -8,5 +8,6 @@
         "scminput": false
     },
     "git.autofetch": true,
-    "git.autofetchPeriod": 180
+    "git.autofetchPeriod": 180,
+    "terminal.integrated.gpuAcceleration": "off"
 }

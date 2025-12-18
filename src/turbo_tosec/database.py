@@ -36,7 +36,6 @@ class DatabaseManager:
         """Establishes connection and ensures schema exists."""
         self.conn = duckdb.connect(self.db_path)
         
-        
         if self.config.turbo:
             print(f"DB: Turbo Mode engaged (Low safety, High speed) | Mem: {self.config.memory} | Threads: {self.config.threads}")
             
@@ -59,10 +58,14 @@ class DatabaseManager:
             self.conn.close()
             self.conn = None
 
-    def _setup_schema(self):
-        """Creates tables if they don't exist."""
+    def _setup_schema(self, target_conn=None):
+        """Creates tables. Can work on the main connection or a provided temporary one."""
+        connection = target_conn or self.conn
+        if not connection:
+            return
+
         # Main ROM table
-        self.conn.execute("""
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS roms (
                 dat_filename VARCHAR,
                 platform VARCHAR,
@@ -77,16 +80,16 @@ class DatabaseManager:
                 system VARCHAR
             )
         """)
-        # processed files table
-        self.conn.execute("""
+        # Processed files table
+        connection.execute("""
             CREATE TABLE IF NOT EXISTS processed_files (
                 filename VARCHAR PRIMARY KEY,
                 processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Metadata (for vesion control, etc.)
-        self.conn.execute("CREATE TABLE IF NOT EXISTS db_metadata (key VARCHAR PRIMARY KEY, value VARCHAR)")
-
+        # Metadata
+        connection.execute("CREATE TABLE IF NOT EXISTS db_metadata (key VARCHAR PRIMARY KEY, value VARCHAR)")
+    
     def get_metadata_value(self, key: str) -> Optional[str]:
         """Fetches a value from the metadata table safely."""
         try:
@@ -97,9 +100,7 @@ class DatabaseManager:
 
     def set_metadata_value(self, key: str, value: str):
         """Sets or updates a metadata key."""
-        # Upsert logic (delete if exists, then insert)
-        self.conn.execute("DELETE FROM db_metadata WHERE key=?", (key, ))
-        self.conn.execute("INSERT INTO db_metadata VALUES (?, ?)", (key, value))
+        self.conn.execute("INSERT OR REPLACE INTO db_metadata VALUES (?, ?)", (key, value))
 
     def get_processed_files(self) -> set:
         """Returns a set of filenames that have already been imported."""
@@ -160,7 +161,8 @@ class DatabaseManager:
         start = time.time()
         
         try:
-            conn = self.create_database(db_path) # Şemayı oluştur
+            conn = duckdb.connect(db_path) 
+            self._setup_schema(target_conn=conn)
             conn.execute(f"PRAGMA threads={threads}")   
             # Read Parquet and insert into table
             conn.execute(f"INSERT INTO roms SELECT * FROM read_parquet('{parquet_path}')")
@@ -174,7 +176,35 @@ class DatabaseManager:
             
         except Exception as error:
             print(f"  Import failed: {error}")
+    
+    def import_from_parquet_folder(self, folder_path: str):
+        """
+        Bulk imports all .parquet files from a directory into the main table.
+        Uses DuckDB's 'read_parquet' with wildcard support for maximum speed.
+        """
+        if not os.path.exists(folder_path):
+             raise FileNotFoundError(f"Parquet folder not found: {folder_path}")
+
+        # Check the folder for the existence of the part files.
+        # DuckDB may throw an error or perform an empty operation if there is an empty folder
+        if not any(f.endswith(".parquet") for f in os.listdir(folder_path)):
+            print("No .parquet files found in temp folder to import.")
+            return
+
+        print(f"DuckDB: Bulk importing chunks from {folder_path}/*.parquet ...")
+        
+        try:
+            # DuckDB's glob (*) capability ensures it to retrieve thousands of files 
+            # with a single SQL command without looping.
+            query = f"INSERT INTO roms SELECT * FROM read_parquet('{folder_path}/*.parquet', union_by_name=True);"
+            self.conn.execute(query)
             
+            print("Bulk Import Success.")
+            
+        except Exception as error:
+            print(f"Bulk Import Error: {error}")
+            raise error
+    
     def configure_threads(self, thread_count: int):
         """Sets the PRAGMA threads for DuckDB."""
         if thread_count > 0:
@@ -232,18 +262,6 @@ class DatabaseManager:
         except Exception as error:
             print(f"RAM detection failed ({error}), defaulting to 2GB.")
             return "2GB"
-        
-    def get_metadata_value(self, key: str) -> Optional[str]:
-        """Fetches a value from the metadata table safely."""
-        try:
-            result = self.conn.execute("SELECT value FROM db_metadata WHERE key=?", (key, )).fetchone()
-            return result[0] if result else None
-        except:
-            return None
-
-    def set_metadata_value(self, key: str, value: str):
-        """Sets or updates a metadata key."""
-        self.conn.execute("INSERT OR REPLACE INTO db_metadata VALUES (?, ?)", (key, value))
-        
+            
     def get_appender(self, table_name):
         return self.conn.cursor().appender(table_name)
