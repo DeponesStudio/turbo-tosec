@@ -26,13 +26,13 @@
             },
             "args": [
                 "--input", 
-                "${workspaceFolder}/TEST_DATS",
+                "${workspaceFolder}/TEST_DATS/TOSEC-v2021-12-31",
+                "--streaming",
                 "--workers", 
-                "1"
+                "4"
             ],
             "console": "integratedTerminal",
             "justMyCode": true
         }
-       
     ]
 }

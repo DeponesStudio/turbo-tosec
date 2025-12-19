@@ -8,6 +8,7 @@ from pathlib import Path
 from tqdm import tqdm
 import logging
 import multiprocessing
+import gc
 
 from turbo_tosec.database import DatabaseManager
 from turbo_tosec.parser import DatFileParser
@@ -143,8 +144,15 @@ class ImportSession:
             self._start_monitor(pbar)
 
             # Generate Parquet Files
-            with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+            
+            executor = concurrent.futures.ProcessPoolExecutor(max_workers=workers)
+            
+            try:
+                
+                # Eğer durdurma/kill özelliği için self.executor lazımsa,
+                # sadece işlem süresince tutup finally bloğunda None yapacağız.
                 self.executor = executor
+                
                 # Call Streaming worker
                 future_to_file = {executor.submit(worker_stream_task, f, self.temp_dir): f for f in files}
                 
@@ -152,6 +160,16 @@ class ImportSession:
                     file_path = future_to_file[future]
                     try:
                         stats = future.result() # Return as Dict: {'roms': 500, 'size': 1024}
+                        
+                        # Check Skipped Files (for Legacy CMP files)
+                        if stats.get("skipped"):
+                            tqdm.write(f"Skipped: {stats.get('file')} ({stats.get('reason')})")
+                            # Push the bar amount of the size of the file so it can reach 100%.
+                            try:
+                                pbar.update(os.path.getsize(file_path))
+                            except:
+                                pbar.update(0)
+                            continue
                         
                         # Update stats
                         self.total_roms += stats.get('roms', 0)
@@ -167,8 +185,12 @@ class ImportSession:
 
                     except Exception as error:
                         self._handle_error(error, file_path)
-            
-            self._stop_monitor()
+            finally:
+                self.executor = None
+                executor.shutdown(wait=True)
+                del executor
+                gc.collect()
+                self._stop_monitor()
 
         # Bulk Import into DUCKDB
         if self.total_roms > 0:

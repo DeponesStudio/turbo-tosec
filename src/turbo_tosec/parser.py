@@ -6,6 +6,35 @@ import logging
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+def _detect_file_format(file_path: str) -> str:
+    """
+    Dosyanın başlığını okuyarak XML mi yoksa Legacy CMP mi olduğunu anlar.
+    Tüm dosyayı okumaz, sadece ilk 1KB'a bakar. Hızlıdır.
+    
+    Returns: 'xml', 'cmp', or 'unknown'
+    """
+    try:
+        # Encoding hatalarını yutuyoruz (errors='ignore') çünkü amacımız sadece başlığı okumak.
+        # Bazı eski DAT dosyalarında garip karakterler olabilir.
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            # İlk 1024 karakter (1KB) formatı anlamak için fazlasıyla yeterli.
+            head = f.read(1024).lower().strip()
+            
+            # 1. XML Kontrolü
+            # Standart XML imzası veya TOSEC/MAME root tag'i var mı?
+            if "<?xml" in head or "<datafile" in head or "<mame" in head:
+                return 'xml'
+            
+            # 2. CMP (Legacy) Kontrolü
+            # ClrMamePro imzası veya parantezli yapı var mı?
+            if "clrmamepro" in head or "rom (" in head or "game (" in head:
+                return 'cmp'
+            
+            return 'unknown'
+
+    except Exception:
+        # Dosya okunamazsa (örneğin binary ise veya yetki yoksa)
+        return 'unknown'
 
 class DatFileParser:
     """
@@ -145,6 +174,10 @@ def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500
     Reads XML in a streaming fashion and writes directly to Parquet using PyArrow.
     No Pandas dependency = Smaller EXE size.
     """
+    fmt = _detect_file_format(file_path)
+    if fmt != 'xml':
+        raise ValueError(f"SKIPPED_LEGACY_FORMAT: Detected '{fmt}'. Streaming mode requires XML.")
+    
     dat_filename = os.path.basename(file_path)
     try:
         system_name = os.path.basename(os.path.dirname(file_path))
@@ -158,10 +191,17 @@ def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500
     
     # PyArrow Schema (Define manually for type-safety)
     # DuckDB recognizes types automatically.
-    schema = pa.schema([('filename', pa.string()), ('platform', pa.string()), ('game_name', pa.string()),
-                        ('description', pa.string()), ('rom_name', pa.string()), ('size', pa.int64()),    # Bazı bozuk dat'larda string gelebilir, string tutmak güvenli
-                        ('crc', pa.string()), ('md5', pa.string()), ('sha1', pa.string()), 
-                        ('status', pa.string()), ('system', pa.string())
+    schema = pa.schema([('filename', pa.string()), 
+                        ('platform', pa.string()), 
+                        ('game_name', pa.string()),
+                        ('description', pa.string()), 
+                        ('rom_name', pa.string()), 
+                        ('size', pa.int64()),
+                        ('crc', pa.string()), 
+                        ('md5', pa.string()), 
+                        ('sha1', pa.string()), 
+                        ('status', pa.string()), 
+                        ('system', pa.string())
     ])
     
     try:
@@ -174,13 +214,15 @@ def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500
                 description = desc_node.text if desc_node is not None else ""
                 
                 for rom in elem.findall('rom'):
+                    final_size = _try_parse_size(rom.get('size'))
+                    
                     row = {
                         'filename': dat_filename,
                         'platform': platform,
                         'game_name': game_name,
                         'description': description,
                         'rom_name': rom.get('name'),
-                        'size': rom.get('size'),
+                        'size': final_size,
                         'crc': rom.get('crc'),
                         'md5': rom.get('md5'),
                         'sha1': rom.get('sha1'),
