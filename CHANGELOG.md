@@ -1,25 +1,25 @@
-# [1.9.0](https://github.com/DeponesStudio/turbo-tosec/compare/v1.8.3...v1.9.0) (2025-12-19)
+# [1.9.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.8.3...v1.9.0) (2025-12-19)
 
 
 ### Bug Fixes
 
-* database class ([070144c](https://github.com/DeponesStudio/turbo-tosec/commit/070144ce5ed25025d4aa3a0bafaa727c7d3c5f87))
-* **db:** remove unsupported 'journal_mode' pragma to prevent crash ([d173967](https://github.com/DeponesStudio/turbo-tosec/commit/d17396721d4b902f7eeedb32b71650abb0812225))
-* Parameter count ([d868492](https://github.com/DeponesStudio/turbo-tosec/commit/d8684927983bff55d05b81ff4cb10dce1085d4dd))
-* performance regression in turbo mode ([6a352ff](https://github.com/DeponesStudio/turbo-tosec/commit/6a352ff2516553a53a5088a55a7123c9b9bda50e))
-* purge remaining sqlite-specific configs incompatible with duckdb ([ad95598](https://github.com/DeponesStudio/turbo-tosec/commit/ad95598486b6b927c15eff98ead9097c5f1a3a7d))
+* database class ([070144c](https://github.com/DeponesLabs/turbo-tosec/commit/070144ce5ed25025d4aa3a0bafaa727c7d3c5f87))
+* **db:** remove unsupported 'journal_mode' pragma to prevent crash ([d173967](https://github.com/DeponesLabs/turbo-tosec/commit/d17396721d4b902f7eeedb32b71650abb0812225))
+* Parameter count ([d868492](https://github.com/DeponesLabs/turbo-tosec/commit/d8684927983bff55d05b81ff4cb10dce1085d4dd))
+* performance regression in turbo mode ([6a352ff](https://github.com/DeponesLabs/turbo-tosec/commit/6a352ff2516553a53a5088a55a7123c9b9bda50e))
+* purge remaining sqlite-specific configs incompatible with duckdb ([ad95598](https://github.com/DeponesLabs/turbo-tosec/commit/ad95598486b6b927c15eff98ead9097c5f1a3a7d))
 
 
 ### Features
 
-* add cross-platform RAM detection (Windows/Linux) for turbo mode ([c4a8d81](https://github.com/DeponesStudio/turbo-tosec/commit/c4a8d8106f47bf91f45aa82b963a12eaea72bb76))
-* **parser:** implement XML to temp-parquet chunking for memory optimization ([798a52f](https://github.com/DeponesStudio/turbo-tosec/commit/798a52fced3414a745c9f65db8793aab0ae797b0))
-* xml chunking strategy ([fbb6b90](https://github.com/DeponesStudio/turbo-tosec/commit/fbb6b904805df1b00600420211947f789b23fb02))
+* add cross-platform RAM detection (Windows/Linux) for turbo mode ([c4a8d81](https://github.com/DeponesLabs/turbo-tosec/commit/c4a8d8106f47bf91f45aa82b963a12eaea72bb76))
+* **parser:** implement XML to temp-parquet chunking for memory optimization ([798a52f](https://github.com/DeponesLabs/turbo-tosec/commit/798a52fced3414a745c9f65db8793aab0ae797b0))
+* xml chunking strategy ([fbb6b90](https://github.com/DeponesLabs/turbo-tosec/commit/fbb6b904805df1b00600420211947f789b23fb02))
 
 
 ### Performance Improvements
 
-* enable high-performance duckdb pragmas (turbo mode) ([a33e47b](https://github.com/DeponesStudio/turbo-tosec/commit/a33e47bc6a140227a56d383d3da67de7ba81afac)), closes [hi#performance](https://github.com/hi/issues/performance)
+* enable high-performance duckdb pragmas (turbo mode) ([a33e47b](https://github.com/DeponesLabs/turbo-tosec/commit/a33e47bc6a140227a56d383d3da67de7ba81afac)), closes [hi#performance](https://github.com/hi/issues/performance)
 
 ## [1.8.3](https://github.com/berkacunas/turbo-tosec/compare/v1.8.2...v1.8.3) (2025-12-13)
 

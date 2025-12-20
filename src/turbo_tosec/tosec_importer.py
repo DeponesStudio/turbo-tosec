@@ -31,7 +31,7 @@ Usage:
     python tosec_importer.py scan -i "path/to/dats" -w 8
     python tosec_importer.py parquet -o "backup.parquet"
 
-Author: Depones Studio
+Author: Depones Labs
 License: GPL v3
 """
 import os
@@ -288,7 +288,7 @@ def main():
     Usage: turbo-tosec parquet -o "backup.parquet"
 
  ---------------------------
- Author:  Berk Acunas & Depones Studio
+ Author:  Berk Acunas & Depones Labs
  License: GPL v3 (Open Source)
  GitHub:  https://github.com/berkacunas/turbo-tosec
 """)

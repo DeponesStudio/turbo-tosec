@@ -134,4 +134,4 @@ turbo-tosec, bağımsız bir geliştirici tarafından geliştirilmekte ve sürd�
 
 *Yasal Uyarı: Bu proje herhangi bir TOSEC veritabanı dosyası veya ROM barındırmaz. Yalnızca TOSEC projesi tarafından sağlanan metadata dosyalarını işlemek için bir araç sunar.*
 
-**Telif Hakkı © 2025 berkacunas & DeponesStudio.**
+**Telif Hakkı © 2025 berkacunas & Depones Labs.**

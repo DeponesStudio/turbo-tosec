@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DeponesStudio/turbo-tosec.git"
+    "url": "git+https://github.com/DeponesLabs/turbo-tosec.git"
   },
   "keywords": [
     "tosec",
@@ -26,7 +26,7 @@
     "xml-parser",
     "high-performance"
   ],
-  "author": "Berk Acunas & Depones Studio",
+  "author": "Berk Acunas & Depones Labs",
   "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/berkacunas/turbo-tosec/issues"

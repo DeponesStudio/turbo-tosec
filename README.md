@@ -130,4 +130,4 @@ turbo-tosec is developed and maintained by an independent developer. If you find
 ---
 *Disclaimer: This project does not contain TOSEC database files or ROMs. It strictly provides a tool to process the metadata files provided by the TOSEC project.*
 
-**Copyright © 2025 berkacunas & DeponesStudio.**
+**Copyright © 2025 berkacunas & Depones Labs.**
