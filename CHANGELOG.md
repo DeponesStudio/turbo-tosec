@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/DeponesLabs/turbo-tosec/compare/v1.10.0...v1.10.1) (2025-12-21)
+
+
+### Bug Fixes
+
+* call freeze_support in __main__ ([ecaea27](https://github.com/DeponesLabs/turbo-tosec/commit/ecaea2712f16b9923c75c4a7ec3f4ac8d777606e))
+
 # [1.10.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.9.0...v1.10.0) (2025-12-21)
 
 
