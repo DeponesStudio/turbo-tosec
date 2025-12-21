@@ -1,3 +1,17 @@
+# [1.10.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.9.0...v1.10.0) (2025-12-21)
+
+
+### Bug Fixes
+
+* add freeze_support() to stop arguments required loop ([10f225f](https://github.com/DeponesLabs/turbo-tosec/commit/10f225f92550525e2f2d2ed52b429d1c5e242d13))
+* requirements.txt ([e467b2e](https://github.com/DeponesLabs/turbo-tosec/commit/e467b2eb749e85767d5a3c750aca88184793a71f))
+
+
+### Features
+
+* add file size distribution analysis notebook (closes [#69](https://github.com/DeponesLabs/turbo-tosec/issues/69)) ([8735594](https://github.com/DeponesLabs/turbo-tosec/commit/87355948e16587a5fc2250432f226005088ea597))
+* complete research phase with size analysis and performance benchmarks ([9e765a2](https://github.com/DeponesLabs/turbo-tosec/commit/9e765a2c95f003eac88ce3d83d658d6385df18d1))
+
 # [1.9.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.8.3...v1.9.0) (2025-12-19)
 
 
