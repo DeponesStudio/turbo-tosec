@@ -215,8 +215,6 @@ def run_parquet_mode(args):
 
 def main():
     
-    freeze_support() # Missing freeze_support() causes "arguments required" loop
-    
     # Backward Compatibility Hack
     # If no subcommand given, and not asking for help/version, add 'scan' as default command.
     if len(sys.argv) > 1 and sys.argv[1] not in ['scan', 'parquet', '--help', '-h', '--version', '-v', '--about']:
@@ -361,4 +359,5 @@ def main():
         
 if __name__ == "__main__":
     
+    freeze_support() # Missing freeze_support() causes "arguments required" loop
     main()
