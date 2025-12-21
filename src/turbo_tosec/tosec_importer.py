@@ -43,6 +43,7 @@ import argparse
 import logging
 import subprocess
 import platform
+from multiprocessing import freeze_support
 
 from turbo_tosec.database import DatabaseManager, DBConfig
 from turbo_tosec.session import ImportSession
@@ -213,7 +214,9 @@ def run_parquet_mode(args):
             db.import_from_parquet(args.import_file, args.workers)
 
 def main():
-
+    
+    freeze_support() # Missing freeze_support() causes "arguments required" loop
+    
     # Backward Compatibility Hack
     # If no subcommand given, and not asking for help/version, add 'scan' as default command.
     if len(sys.argv) > 1 and sys.argv[1] not in ['scan', 'parquet', '--help', '-h', '--version', '-v', '--about']:
