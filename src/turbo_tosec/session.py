@@ -234,8 +234,6 @@ class ImportSession:
         with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, 
                   unit_divisor=1024, desc="Direct Ingestion") as pbar:
             
-            self._start_monitor(pbar)
-            
             for file_path in files:
                 try:
                     # Metadata Extraction
@@ -306,8 +304,6 @@ class ImportSession:
                 except Exception as e:
                     self._handle_error(e, file_path)
             
-            self._stop_monitor()
- 
     def _start_monitor(self, pbar):
         self.stop_monitor.clear()
         def monitor_progress():
