@@ -68,6 +68,9 @@ class ImportSession:
         self.staged = getattr(args, 'staged', False) 
         # DirectMode: Uses RAM buffer + Zero Copy (fastest)
         self.direct = getattr(args, 'direct', False)
+        # LegacyMode
+        self.legacy = getattr(args, 'legacy', False)
+        
         # Temp dir is only relevant for StagedMode
         self.temp_dir = getattr(args, 'temp_dir', 'temp_chunks')
 
@@ -111,21 +114,21 @@ class ImportSession:
                 Console.info("Threads   : Main Process + DuckDB Internal", indent=2)
                 Console.info("I/O Type  : Memory Stream", indent=2)
                 self._run_direct_mode(files_to_process, total_bytes, initial_bytes)
+                    
+            elif self.legacy:
+                # Strategy 1: In-Memory Mode
+                Console.section(f"Strategy: In-Memory Mode (Legacy/Standard)")
+                Console.info("Technique : DOM Parsing", indent=2)
+                Console.info(f"Workers   : {workers}", indent=2)
+                self._run_in_memory_mode(files_to_process, workers, total_bytes, initial_bytes)
                 
-            elif self.staged:
+            else:
                 # Strategy 2: Staged Mode
                 Console.section(f"Strategy: Staged Mode (Batch)")
                 Console.info("Technique : ETL (Extract -> Transform -> Load)", indent=2)
                 Console.info(f"Staging   : {self.temp_dir}/ (Parquet)", indent=2)
                 Console.info(f"Workers   : {workers}", indent=2)
                 self._run_staged_mode(files_to_process, workers, total_bytes, initial_bytes)
-                
-            else:
-                # Strategy 1: In-Memory Mode
-                Console.section(f"Strategy: In-Memory Mode (Legacy/Standard)")
-                Console.info("Technique : DOM Parsing", indent=2)
-                Console.info(f"Workers   : {workers}", indent=2)
-                self._run_in_memory_mode(files_to_process, workers, total_bytes, initial_bytes)
 
         except KeyboardInterrupt:
             Console.warning("Process interrupted by user (SIGINT).")

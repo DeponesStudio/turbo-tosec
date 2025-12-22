@@ -85,14 +85,14 @@ def check_system_resources(workers, db_threads):
         
         if total_requested_threads > cpu_count:
             print(f"WARNING: You requested {total_requested_threads} concurrent threads ({workers} workers x {db_threads} db_threads).")
-            print(f"    Your system only has {cpu_count} cores.")
+            print(f"Your system only has {cpu_count} cores.")
             print("    -> This may cause 'Context Switching' overhead and SLOW DOWN the process.")
             print("    -> Recommendation: Keep (workers * db_threads) <= CPU Cores.")
         else:
             print(f"Configuration looks good: {total_requested_threads} threads <= {cpu_count} cores.")
             
     except Exception as e:
-        print(f"⚠️  Resource check skipped: {e}")
+        print(f"Resource check skipped: {e}")
         
 def run_scan_mode(args, log_filename: str):
     """
@@ -237,6 +237,7 @@ def main():
     
     strategy_group.add_argument("--staged", action="store_true", help="[Strategy] Staged Mode (Batch/ETL). XML -> Parquet (Disk) -> DB. Safest for huge sets, supports checkpoints.")
     strategy_group.add_argument("--direct", action="store_true", help="[Strategy] Direct Mode (Stream). XML -> Arrow (RAM) -> DB. Zero-Copy ingestion. Fastest.")
+    strategy_group.add_argument("--legacy", action="store_true", help="[Strategy] In-Memory Mode (Old). XML -> DOM (RAM). High memory usage. Deprecated.")
 
     parser_scan.add_argument("--temp-dir", default="temp_chunks", help="Directory for temporary chunk files (used in --staged mode).")
     

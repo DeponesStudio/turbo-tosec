@@ -1,14 +1,10 @@
-# 🚀 turbo-tosec
+# 🚀 turbo-tosec v2.0
 
-[![CI/CD](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml/badge.svg)](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Latest Release](https://img.shields.io/github/v/release/berkacunas/turbo-tosec)](https://github.com/berkacunas/turbo-tosec/releases)
+> **High-Performance TOSEC Ingestion Engine powered by DuckDB & Apache Arrow.**
 
-> **High-performance, DuckDB-based importer to query TOSEC databases at light speed.**
+**turbo-tosec** is a next-generation data engineering tool designed to scan, parse, and convert massive **TOSEC (The Old School Emulation Center)** DAT collections into a single, instantly queryable **DuckDB** database file.
 
-**turbo-tosec** scans, parses, and converts the massive **TOSEC (The Old School Emulation Center)** DAT collection into a single, instantly queryable **DuckDB** database file.
-
-Designed for archivists and retro gaming enthusiasts, it transforms piles of hundreds of thousands of XML/DAT files into a modern format that can be queried via SQL in seconds.
+Unlike traditional XML parsers, **turbo-tosec v2.0** utilizes modern **Zero-Copy Ingestion** and **ETL Staging** techniques to process gigabytes of metadata in seconds, transforming scattered XML files into a structured SQL warehouse.
 
 ---
 
@@ -16,118 +12,144 @@ Designed for archivists and retro gaming enthusiasts, it transforms piles of hun
 
 If you don't want to install Python, simply download the standalone executable for your OS:
 
-* **Windows:** [Download `turbo-tosec_v1.11.2_Windows.exe`](https://github.com/berkacunas/turbo-tosec/releases/latest)
-* **Linux:** [Download `turbo-tosec_v1.11.2_Linux.tar.gz`](https://github.com/berkacunas/turbo-tosec/releases/latest)
+* **Windows:** [Download `turbo-tosec_v2.0.0_Windows.exe](https://github.com/deponeslabs/turbo-tosec/releases/latest%5D(https://github.com/deponeslabs/turbo-tosec/releases/latest))`
+* **Linux:** [Download `turbo-tosec_v2.0.0_Linux.tar.gz](https://github.com/deponeslabs/turbo-tosec/releases/latest%5D(https://github.com/deponeslabs/turbo-tosec/releases/latest))`
 
 ---
 
-## ⚡ Why turbo-tosec?
+## ⚡ Why turbo-tosec v2.0?
 
-  - **Speed Driven:** Combines Python's XML parsing power with DuckDB's "Bulk Insert" capabilities for maximum throughput.
-  - **Zero Dependencies:** No need for external servers (MySQL, Postgres). The output is a single, portable `.duckdb` file.
-  - **Smart Scanning:** Automatically finds thousands of `.dat` files in nested subdirectories (`recursive scan`).
-  - **Progress Tracking:** Detailed, real-time progress bar via `tqdm`.
+* **Smart Default Strategy:** Automatically selects the safest ingestion method (Staged Mode) without complex configuration.
+* **Crash-Safe & Resumable:** Power outage? No problem. **Staged Mode** saves progress to disk and resumes exactly where it left off.
+* **Zero Dependencies:** No need for MySQL or Postgres servers. The output is a single, portable `.duckdb` file.
+* **Apache Arrow Integration:** Uses columnar memory formats for lightning-fast data transfer between Python and DuckDB (Direct Mode).
+* **Smart Recursive Scanning:** Automatically hunts down thousands of `.dat` files in nested subdirectories.
 
 ## 📦 Installation
 
-This project requires Python 3.x.
+This project requires Python 3.9+.
 
 ```bash
 git clone https://github.com/berkacunas/turbo-tosec.git
 cd turbo-tosec
-pip install -r requirements.txt
+pip install .
+
 ```
 
-## 🛠️ Usage
+## 🛠️ Usage & Strategies
 
-### 1\. Prepare the Data
+**turbo-tosec** offers different strategies to handle data ingestion. Choose the one that fits your needs:
 
-This tool processes TOSEC DAT files (metadata). Download the latest DAT package from the [Official TOSEC Website](https://www.tosecdev.org/downloads) and extract it to a folder.
+### 1. Staged Mode (Default / Recommended) 🛡️
 
-### 2\. Run the Importer
+**Best for:** Huge Datasets, Reliability, Crash Safety.
 
-#### Standard Mode (Safe)
-Best for debugging or small collections. Uses a single thread.
-```bash
-python tosec_importer.py -i "/path/to/TOSEC" -o "tosec.duckdb"
-```
+This is the **default behavior**. Follows the **ETL (Extract, Transform, Load)** pattern. Parses XMLs into compressed temporary Parquet files before bulk loading.
 
-#### Turbo Mode (Multi-Threaded) 🔥
-
-Unleash the full power of your CPU\! Recommended for full TOSEC imports.
+* **Resumable:** If the process is interrupted, re-running the command will skip already processed files.
+* **Safe:** Minimizes RAM usage spikes.
 
 ```bash
-# Use 8 worker threads and larger batch size
-python tosec_importer.py -i "/path/to/TOSEC" -w 8 -b 5000
+# Just run it. Staged mode is automatic.
+turbo-tosec --input "C:\TOSEC\DATs"
+
+# Optional: You can specify worker threads manually
+turbo-tosec --input "C:\TOSEC\DATs" --workers 4
+
 ```
 
-#### CLI Arguments
+### 2. Direct Mode (Streaming) 🏎️
+
+**Best for:** High Speed, Good RAM, Fast SSDs.
+
+Uses **Apache Arrow** to stream XML data directly into DuckDB without intermediate disk I/O. This is the fastest method (Zero-Copy) but less fault-tolerant than Staged Mode.
+
+```bash
+turbo-tosec --input "C:\TOSEC\DATs" --direct
+
+```
+
+### 3. In-Memory Mode (Legacy) 💾
+
+**Best for:** Very small files or debugging.
+
+Old method. Loads the entire XML DOM into RAM. **Deprecated** and not recommended for large files.
+
+```bash
+turbo-tosec --input "C:\TOSEC\DATs" --legacy
+
+```
+
+## ⚙️ CLI Arguments
 
 | Flag | Description | Default |
-| :--- | :--- | :--- |
+| --- | --- | --- |
 | `-i, --input` | Path to the root directory containing DAT files. | **Required** |
 | `-o, --output` | Path for the output DuckDB database. | `tosec.duckdb` |
-| `-w, --workers` | Number of parallel parsing threads. | `1` |
-| `-b, --batch-size`| Number of records to insert per DB transaction. | `1000` |
-| `--no-open-log` | Do NOT automatically open the log file on error. | `False` |
+| `--staged` | Explicitly enable ETL Batch Mode (Default behavior). | `True` (Implicit) |
+| `--direct` | Enable Zero-Copy Streaming Mode (Fastest). | `False` |
+| `--legacy` | Enable deprecated In-Memory DOM Mode. | `False` |
+| `-w, --workers` | Number of parallel processes (Staged Mode). | `CPU Count` |
+| `--temp-dir` | Directory for staging Parquet chunks. | `temp_chunks` |
+| `-b, --batch-size` | Batch size for insertion transactions. | `1000` |
 
-## ⚡ Performance
+## ⚡ Performance Benchmarks
 
-*Benchmarks based on a dataset of \~3,000 DAT files (approx. 1 million ROM entries).*
+*Tests performed on a dataset of ~3,000 DAT files (1M+ ROM entries).*
 
-| Mode | Workers | Time |
-| :--- | :--- | :--- |
-| **Standard** | 1 | \~45 seconds |
-| **Turbo** | 4 | \~15 seconds |
-| **Turbo Max** | 8 | \~9 seconds |
+| Strategy | Speed | RAM Usage | Disk I/O |
+| --- | --- | --- | --- |
+| **In-Memory** | 🐢 Slow | 🔴 High | Low |
+| **Staged** | 🐇 Fast | 🟢 Low | High (Temp files) |
+| **Direct** | 🐆 **Fastest** | 🟢 Low | **Minimal** |
 
-> *Note: Performance scales well with core count until disk I/O becomes the bottleneck.*
+## 🔍 Example Queries (SQL)
 
-## 🔍 Example Queries (DuckDB / SQL)
+You can open the generated `.duckdb` file using **DBeaver** or **VSCode SQLTools**.
 
-You can open the generated database using **DBeaver**, **VSCode SQLTools**, or **Python** to run queries like these:
-
-**Find Verified [\!] Commodore 64 Games:**
+**Find Verified [!] Commodore 64 Games:**
 
 ```sql
 SELECT game_name, rom_name 
 FROM roms 
 WHERE platform LIKE '%Commodore 64%' 
   AND rom_name LIKE '%[!]%';
+
 ```
 
-**Verify a Local File (via Hash):**
+**Find Duplicates (Clone Checking):**
 
 ```sql
-SELECT * FROM roms WHERE md5 = 'YOUR_FILE_MD5_HASH_HERE';
+SELECT crc, COUNT(*) as count 
+FROM roms 
+GROUP BY crc 
+HAVING count > 1 
+ORDER BY count DESC;
+
 ```
 
-## 📚 Documentation & Wiki
+## 📚 Documentation
 
-For detailed guides, please refer to the Project Wiki: **[Project Wiki](https://github.com/berkacunas/turbo-tosec/wiki)
-
-* 🚀 **[Getting Started](https://github.com/berkacunas/turbo-tosec/wiki/Getting-Started):** Step-by-step guide from downloading DATs to your first scan.
-* 🔧 **[CLI Reference](https://github.com/berkacunas/turbo-tosec/wiki/CLI-Reference):** Detailed explanation of all commands and flags.
-* 🍳 **[SQL Cookbook](https://github.com/berkacunas/turbo-tosec/wiki/SQL-Cookbook):** Ready-to-use SQL recipes to query your collection with DBeaver.
+For detailed architecture explanations and advanced usage, please refer to the **[Project Wiki](https://github.com/deponeslabs/turbo-tosec/wiki)**.
 
 ## 📄 License
 
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
---- 
+---
+
 ## ❤️ Support the Project
 
-turbo-tosec is developed and maintained by an independent developer. If you find this tool useful and want to support its continued development (or simply want to say thanks for the pre-built `.exe`), please consider making a donation!
+**turbo-tosec** is developed and maintained by **Depones Labs**. If you find this tool useful, please consider making a donation to support open-source development.
 
-<a href="https://github.com/sponsors/berkacunas">
-  <img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors" height="50" alt="Sponsor on GitHub">
+<a href="[https://github.com/sponsors/berkacunas](https://github.com/sponsors/berkacunas)">
+<img src="[https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors)" height="50" alt="Sponsor on GitHub">
 </a>
 
-<a href="https://www.buymeacoffee.com/depones" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-
-* **Star this repo!** ⭐ It helps visibility.
+<a href="[https://www.buymeacoffee.com/depones](https://www.buymeacoffee.com/depones)" target="_blank"><img src="[https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 ---
+
 *Disclaimer: This project does not contain TOSEC database files or ROMs. It strictly provides a tool to process the metadata files provided by the TOSEC project.*
 
-**Copyright © 2025 berkacunas & Depones Labs.**
+**Copyright © 2025 Depones Labs.**
