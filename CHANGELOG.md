@@ -1,3 +1,11 @@
+# [1.11.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.10.1...v1.11.0) (2025-12-22)
+
+
+### Features
+
+* add direct mode ([2eb6cb4](https://github.com/DeponesLabs/turbo-tosec/commit/2eb6cb4a7842e00b99742f9455b9e6f13551605a))
+* add retro-ascii-style-output ([0b4881c](https://github.com/DeponesLabs/turbo-tosec/commit/0b4881c0539fa0e835d73a0c1a6b3f8bd8a0d234))
+
 ## [1.10.1](https://github.com/DeponesLabs/turbo-tosec/compare/v1.10.0...v1.10.1) (2025-12-21)
 
 
