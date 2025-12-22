@@ -28,7 +28,7 @@ Python kurulumuna ihtiyaç duymadan, işletim sisteminize uygun derlenmiş sür�
 
 ## 📦 Kurulum
 
-Bu proje Python 3.9 ve üzeri sürümleri gerektirir.
+Bu proje Python 3.9 ve üzeri sürümleri gerektirir. 
 
 ```bash
 git clone https://github.com/berkacunas/turbo-tosec.git
