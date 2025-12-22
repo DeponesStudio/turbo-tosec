@@ -1,137 +1,139 @@
-# 🚀 turbo-tosec
+# 🚀 turbo-tosec v2.0
 
-[![CI/CD](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml/badge.svg)](https://github.com/berkacunas/turbo-tosec/actions/workflows/release.yml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Latest Release](https://img.shields.io/github/v/release/berkacunas/turbo-tosec)](https://github.com/berkacunas/turbo-tosec/releases)
+> **DuckDB & Apache Arrow Destekli Yüksek Performanslı TOSEC Veri İşleme Motoru.**
 
-> **TOSEC veritabanlarını ışık hızında sorgulamak için DuckDB tabanlı, yüksek performanslı içe aktarma aracı.**
+**turbo-tosec**, kapsamlı **TOSEC (The Old School Emulation Center)** DAT koleksiyonlarını taramak, ayrıştırmak ve sorgulanabilir tek bir **DuckDB** veritabanı dosyasına dönüştürmek için tasarlanmış bir veri mühendisliği aracıdır.
 
-**turbo-tosec**, devasa **TOSEC (The Old School Emulation Center)** DAT koleksiyonunu tarar, ayrıştırır ve anında sorgulanabilir tek bir **DuckDB** veritabanı dosyasına dönüştürür.
+Geleneksel XML ayrıştırıcıların aksine **turbo-tosec v2.0**, gigabytelarce büyüklükteki metaveriyi saniyeler içinde işlemek için modern **Sıfır Kopya (Zero-Copy Ingestion)** ve **ETL (Extract-Transform-Load)** tekniklerini kullanır. Dağınık XML dosyalarını yapılandırılmış bir SQL veri ambarına dönüştürür.
 
-Arşivciler ve retro oyun tutkunları için tasarlanan bu araç, yüz binlerce XML/DAT dosyasından oluşan yığınları, saniyeler içinde SQL ile sorgulanabilen modern bir formata çevirir.
+---
 
------
+### 📥 Kurulumsuz Kullanım (Standalone Executable)
 
-### 📥 Hemen İndir (Python Gerekmez)
+Python kurulumuna ihtiyaç duymadan, işletim sisteminize uygun derlenmiş sürümü kullanabilirsiniz:
 
-Python kurmakla uğraşmak istemiyorsanız, işletim sisteminiz için hazır çalıştırılabilir dosyayı indirebilirsiniz:
+* **Windows:** [İndir: `turbo-tosec_v2.0.0_Windows.exe](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D(https://github.com/berkacunas/turbo-tosec/releases/latest))`
+* **Linux:** [İndir: `turbo-tosec_v2.0.0_Linux.tar.gz](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D(https://github.com/berkacunas/turbo-tosec/releases/latest))`
 
-  * **Windows:** [`turbo-tosec_v1.11.1_Windows.exe` İndir](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D\(https://github.com/berkacunas/turbo-tosec/releases/latest\))
-  * **Linux:** [`turbo-tosec_v1.11.1_Linux.tar.gz` İndir](https://www.google.com/search?q=%5Bhttps://github.com/berkacunas/turbo-tosec/releases/latest%5D\(https://github.com/berkacunas/turbo-tosec/releases/latest\))
+---
 
------
+## ⚡ Temel Özellikler
 
-## ⚡ Neden turbo-tosec?
-
-  - **Hız Odaklı:** Maksimum veri işleme hızı için Python'un XML ayrıştırma gücünü DuckDB'nin "Toplu Ekleme" (Bulk Insert) yetenekleriyle birleştirir.
-  - **Bağımlılık Yok:** Harici sunuculara (MySQL, Postgres) ihtiyaç duymaz. Çıktı, taşınabilir tek bir `.duckdb` dosyasıdır.
-  - **Akıllı Tarama:** İç içe geçmiş alt klasörlerdeki binlerce `.dat` dosyasını otomatik olarak bulur (`recursive scan`).
-  - **İlerleme Takibi:** `tqdm` aracılığıyla detaylı ve gerçek zamanlı ilerleme çubuğu sunar.
+* **Üç Farklı İşleme Stratejisi:** Donanım kısıtlarına ve veri boyutuna göre **Direct**, **Staged** veya **Legacy** modları seçilebilir.
+* **Kesinti Toleransı (Crash-Safe):** Elektrik kesintisi veya sistem hatası durumunda, **Staged Mode** işlemi diske kaydeder ve bir sonraki çalıştırmada kaldığı yerden devam eder (Resume Capability).
+* **Bağımsız Mimari:** Harici bir veritabanı sunucusuna (MySQL, Postgres vb.) ihtiyaç duymaz. Çıktı, taşınabilir bir `.duckdb` dosyasıdır.
+* **Apache Arrow Entegrasyonu:** Python ve DuckDB arasındaki veri transferinde sütun bazlı bellek formatı kullanılarak işlemci maliyeti minimize edilir.
+* **Rekürsif Tarama:** İç içe geçmiş klasör yapılarındaki binlerce `.dat` dosyasını otomatik olarak tespit eder.
 
 ## 📦 Kurulum
 
-Bu proje Python 3.x gerektirir.
+Bu proje Python 3.9 ve üzeri sürümleri gerektirir.
 
 ```bash
 git clone https://github.com/berkacunas/turbo-tosec.git
 cd turbo-tosec
-pip install -r requirements.txt
+pip install .
+
 ```
 
-## 🛠️ Kullanım
+## 🛠️ Kullanım ve Stratejiler
 
-### 1\. Veriyi Hazırlayın
+**turbo-tosec**, veri işleme (ingestion) süreci için üç farklı strateji sunar:
 
-Bu araç TOSEC DAT dosyalarını (metadata) işler. En güncel DAT paketini [Resmi TOSEC Web Sitesinden](https://www.tosecdev.org/downloads) indirin ve bir klasöre çıkartın.
+### 1. Direct Mode (Streaming)
 
-### 2\. İçe Aktarıcıyı Çalıştırın
+**Önerilen Senaryo:** Yüksek Hız, Yeterli RAM, SSD Disk.
 
-#### Standart Mod (Güvenli)
-
-Hata ayıklama veya küçük koleksiyonlar için en iyisidir. Tek bir iş parçacığı (single thread) kullanır.
+XML verisini okur ve **Apache Arrow** kullanarak disk üzerinde ara işlem yapmadan doğrudan DuckDB'ye yazar (Stream). En yüksek işlem hacmine (throughput) sahip moddur.
 
 ```bash
-python tosec_importer.py -i "/dosya/yolu/TOSEC" -o "tosec.duckdb"
+turbo-tosec --input "C:\TOSEC\DATs" --direct
+
 ```
 
-#### Turbo Mod (Çok İş Parçacıklı) 🔥
+### 2. Staged Mode (Batch / ETL)
 
-İşlemcinizin tüm gücünü serbest bırakın\! Tam TOSEC arşivini içe aktarmak için önerilir.
+**Önerilen Senaryo:** Çok Büyük Veri Setleri, Düşük RAM, Veri Güvenliği.
+
+Klasik **ETL** prensibini uygular. XML verisi önce sıkıştırılmış geçici **Parquet** dosyalarına dönüştürülür (Staging), ardından toplu olarak veritabanına yüklenir.
+
+* **Devam Edebilirlik:** İşlem yarıda kesilirse, tekrar çalıştırıldığında işlenmiş dosyalar atlanır.
+* **Paralel İşleme:** Çok çekirdekli işlemcilerde `workers` parametresi ile hızlandırılabilir.
 
 ```bash
-# 8 işçi thread ve daha büyük işlem (batch) boyutu kullanımı
-python tosec_importer.py -i "/dosya/yolu/TOSEC" -w 8 -b 5000
+# 4 işlemci çekirdeği ile çalıştırma örneği
+turbo-tosec --input "C:\TOSEC\DATs" --staged --workers 4
+
 ```
 
-#### Komut Satırı Argümanları
+### 3. In-Memory Mode (Legacy)
+
+**Önerilen Senaryo:** Küçük dosyalar ve hata ayıklama.
+
+Tüm XML ağacını (DOM) belleğe yükler. Büyük dosyalar için bellek yönetimi açısından verimsizdir. Herhangi bir mod belirtilmezse varsayılan olarak bu mod çalışır.
+
+```bash
+turbo-tosec --input "C:\TOSEC\DATs"
+
+```
+
+## ⚙️ Parametreler (CLI)
 
 | Parametre | Açıklama | Varsayılan |
-| :--- | :--- | :--- |
-| `-i, --input` | DAT dosyalarını içeren kök dizinin yolu. | **Zorunlu** |
-| `-o, --output` | Oluşturulacak DuckDB veritabanı dosyasının yolu. | `tosec.duckdb` |
-| `-w, --workers` | Paralel ayrıştırma için kullanılacak iş parçacığı sayısı. | `1` |
-| `-b, --batch-size`| Her veritabanı işleminde (transaction) eklenecek kayıt sayısı. | `1000` |
-| `--no-open-log` | Hata oluştuğunda log dosyasını otomatik olarak **açma**. | `False` |
+| --- | --- | --- |
+| `-i, --input` | DAT dosyalarını içeren kök dizin yolu. | **Zorunlu** |
+| `-o, --output` | Çıktı veritabanı dosyasının yolu. | `tosec.duckdb` |
+| `--direct` | Sıfır Kopya Akış Modunu (Zero-Copy Streaming) etkinleştirir. | `False` |
+| `--staged` | Aşamalı ETL Modunu (Batch Processing) etkinleştirir. | `False` |
+| `-w, --workers` | Paralel işlem sayısı (Sadece Staged Mode). | `CPU Sayısı` |
+| `--temp-dir` | Geçici Parquet dosyaları için dizin (Staged Mode). | `temp_chunks` |
+| `-b, --batch-size` | Veritabanı işlem (transaction) boyutu. | `1000` |
 
-## ⚡ Performans
+## ⚡ Performans Testleri
 
-*Yaklaşık 3.000 DAT dosyası (1 milyon ROM kaydı) içeren bir veri seti baz alınarak yapılan test sonuçlarıdır.*
+*Yaklaşık 3.000 DAT dosyası ve 1 Milyon+ ROM girdisi içeren veri seti üzerinde test edilmiştir.*
 
-| Mod | İşçiler (Workers) | Süre |
-| :--- | :--- | :--- |
-| **Standart** | 1 | \~45 saniye |
-| **Turbo** | 4 | \~15 saniye |
-| **Turbo Max** | 8 | \~9 saniye |
+| Strateji | Hız | RAM Kullanımı | Disk I/O |
+| --- | --- | --- | --- |
+| **In-Memory** | Yavaş | Yüksek | Düşük |
+| **Staged** | Hızlı | Düşük | Yüksek (Geçici Dosya) |
+| **Direct** | **En Hızlı** | Düşük | **Minimal** |
 
-> *Not: Performans, disk okuma hızı (Disk I/O) darboğaz oluşturana kadar işlemci çekirdek sayısıyla orantılı olarak artar.*
+## 🔍 Örnek Sorgular (SQL)
 
-## 🔍 Örnek Sorgular (DuckDB / SQL)
+Oluşturulan `.duckdb` dosyası **DBeaver** veya **VSCode SQLTools** kullanılarak sorgulanabilir.
 
-Oluşturulan veritabanını **DBeaver**, **VSCode SQLTools** veya **Python** kullanarak açabilir ve aşağıdaki gibi sorgular çalıştırabilirsiniz:
-
-**Doğrulanmış [\!] Commodore 64 Oyunlarını Bul:**
+**Doğrulanmış [!] Commodore 64 Oyunlarını Listeleme:**
 
 ```sql
 SELECT game_name, rom_name 
 FROM roms 
 WHERE platform LIKE '%Commodore 64%' 
   AND rom_name LIKE '%[!]%';
+
 ```
 
-**Yerel Bir Dosyayı Doğrula (Hash ile):**
+**Mükerrer Kayıt (Clone) Analizi:**
 
 ```sql
-SELECT * FROM roms WHERE md5 = 'DOSYANIZIN_MD5_HASH_DEGERI';
+SELECT crc, COUNT(*) as count 
+FROM roms 
+GROUP BY crc 
+HAVING count > 1 
+ORDER BY count DESC;
+
 ```
 
-## 📚 Dokümantasyon & Wiki
+## 📚 Dokümantasyon
 
-Dokümantasyon için **[Proje Wikisi](https://github.com/berkacunas/turbo-tosec/wiki)** sayfasına bakınız:
-
-* 🚀 **[Başlangıç Rehberi](https://github.com/berkacunas/turbo-tosec/wiki/Getting-Started):** Kurulum ve ilk tarama rehberi.
-* 🔧 **[CLI Referansı](https://github.com/berkacunas/turbo-tosec/wiki/CLI-Reference):** Komut ve parametrelerin detaylı açıklamaları.
-* 🍳 **[SQL Yemek Kitabı](https://github.com/berkacunas/turbo-tosec/wiki/SQL-Cookbook):** DBeaver ile koleksiyonunuzu sorgulamak için SQL örnekleri.
+Mimari detaylar ve ileri seviye kullanım senaryoları için **[Proje Wiki](https://github.com/berkacunas/turbo-tosec/wiki)** sayfasını inceleyebilirsiniz.
 
 ## 📄 Lisans
 
-This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
+Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır.
 
------
+---
 
-## ❤️ Projeyi Destekleyin
-
-turbo-tosec, bağımsız bir geliştirici tarafından geliştirilmekte ve sürdürülmektedir. Eğer bu aracı faydalı bulduysanız ve geliştirmeyi desteklemek (veya sadece hazır derlenmiş `.exe` için teşekkür etmek) isterseniz, bağış yaparak destek olabilirsiniz\!
-
-\<a href="[https://github.com/sponsors/berkacunas](https://github.com/sponsors/berkacunas)"\>
-\<img src="[https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge\&logo=github-sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors)" height="50" alt="GitHub'da Sponsor Ol"\>
-\</a\>
-
-\<a href="[https://www.buymeacoffee.com/depones](https://www.buymeacoffee.com/depones)" target="\_blank"\>\<img src="[https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)" alt="Buy Me A Coffee" style="height: 60px \!important;width: 217px \!important;" \>\</a\>
-
-  * **Bu repoya yıldız verin\!** ⭐ Görünürlüğe çok yardımcı olur.
-
------
-
-*Yasal Uyarı: Bu proje herhangi bir TOSEC veritabanı dosyası veya ROM barındırmaz. Yalnızca TOSEC projesi tarafından sağlanan metadata dosyalarını işlemek için bir araç sunar.*
+*Yasal Uyarı: Bu proje TOSEC veritabanı dosyalarını veya ROM dosyalarını içermez. Sadece TOSEC projesi tarafından sağlanan metaveri dosyalarını işlemek için teknik bir araç sağlar.*
 
 **Telif Hakkı © 2025 berkacunas & Depones Labs.**
