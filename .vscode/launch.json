@@ -17,19 +17,41 @@
             ]
         },
         {
-            "name": "Debug Turbo-TOSEC (Module)",
+            "name": "Debug: Turbo-TOSEC (Staged Mode)",
             "type": "debugpy",
             "request": "launch",
-            "module": "turbo_tosec.tosec_importer",
+            "module": "turbo_tosec.cli", 
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [
+                "scan",
                 "--input", 
-                "${workspaceFolder}/TEST_DATS/TOSEC-v2021-12-31",
-                "--streaming",
+                "${workspaceFolder}/TEST_DATS/TOSEC-v2016-11-11",
+                "--staged", 
                 "--workers", 
-                "4"
+                "4",
+                "--temp-dir",
+                "debug_temp_chunks"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug: Turbo-TOSEC (Direct Mode)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "turbo_tosec.cli",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "scan",
+                "--input", 
+                "${workspaceFolder}/TEST_DATS/TOSEC-v2016-11-11",
+                "--output",
+                "${workspaceFolder}/TEST_DATS/direct.duckdb",
+                "--direct"
             ],
             "console": "integratedTerminal",
             "justMyCode": true

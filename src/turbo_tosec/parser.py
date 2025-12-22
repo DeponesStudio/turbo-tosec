@@ -8,32 +8,31 @@ import pyarrow.parquet as pq
 
 def _detect_file_format(file_path: str) -> str:
     """
-    Dosyanın başlığını okuyarak XML mi yoksa Legacy CMP mi olduğunu anlar.
-    Tüm dosyayı okumaz, sadece ilk 1KB'a bakar. Hızlıdır.
+    It determines whether a file is XML or Legacy CMP by reading the file header.
+    It doesn't read the entire file, only the first 1KB. It's fast.
     
     Returns: 'xml', 'cmp', or 'unknown'
     """
     try:
-        # Encoding hatalarını yutuyoruz (errors='ignore') çünkü amacımız sadece başlığı okumak.
-        # Bazı eski DAT dosyalarında garip karakterler olabilir.
+        # We're ignoring encoding errors because our goal is simply to read the header. 
+        # Some older DAT files may contain strange characters.
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            # İlk 1024 karakter (1KB) formatı anlamak için fazlasıyla yeterli.
             head = f.read(1024).lower().strip()
             
-            # 1. XML Kontrolü
+            # 1. XML Control
             # Standart XML imzası veya TOSEC/MAME root tag'i var mı?
             if "<?xml" in head or "<datafile" in head or "<mame" in head:
                 return 'xml'
             
-            # 2. CMP (Legacy) Kontrolü
-            # ClrMamePro imzası veya parantezli yapı var mı?
+            # 2. CMP (Legacy) Control
+            # ClrMamePro signature or a structure in parentheses?
             if "clrmamepro" in head or "rom (" in head or "game (" in head:
                 return 'cmp'
             
             return 'unknown'
 
     except Exception:
-        # Dosya okunamazsa (örneğin binary ise veya yetki yoksa)
+        # If the file is unreadable (e.g., if it's binary or if there's no authorization)
         return 'unknown'
 
 class DatFileParser:
@@ -168,15 +167,15 @@ class DatFileParser:
                     ))
         return rows
 
-# Streaming Engine => Xml -> Parquet using PyArraw
+# Staging Engine => Xml -> Parquet using PyArraw
 def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500000) -> Dict:
     """
-    Reads XML in a streaming fashion and writes directly to Parquet using PyArrow.
+    Reads XML in a staging fashion and writes directly to Parquet using PyArrow.
     No Pandas dependency = Smaller EXE size.
     """
     fmt = _detect_file_format(file_path)
     if fmt != 'xml':
-        raise ValueError(f"SKIPPED_LEGACY_FORMAT: Detected '{fmt}'. Streaming mode requires XML.")
+        raise ValueError(f"SKIPPED_LEGACY_FORMAT: Detected '{fmt}'. staging mode requires XML.")
     
     dat_filename = os.path.basename(file_path)
     try:
@@ -245,22 +244,19 @@ def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500
         return {"roms": total_roms, "chunks": chunk_index + 1}
 
     except Exception as e:
-        logging.error(f"Streaming Error in {file_path}: {e}")
+        logging.error(f"Staging Error in {file_path}: {e}")
         raise e
 
 def _write_chunk_arrow(data: List[Dict], output_dir: str, original_filename: str, index: int, schema: pa.Schema):
-    """
-    Writes a list of dicts to Parquet using pure PyArrow.
-    """
+    """Writes a list of dicts to Parquet using pure PyArrow."""
     if not data:
         return
 
     safe_name = "".join(x for x in original_filename if x.isalnum() or x in "._-")
     output_path = os.path.join(output_dir, f"{safe_name}_part_{index}.parquet")
     
-    # 1. List of Dicts -> PyArrow Table (Çok hızlıdır)
+    # 1. List of Dicts -> PyArrow Table
     table = pa.Table.from_pylist(data, schema=schema)
-    
     # 2. Write to Disk
     pq.write_table(table, output_path, compression='snappy')
 

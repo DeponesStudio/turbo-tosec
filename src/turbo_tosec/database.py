@@ -193,10 +193,13 @@ class DatabaseManager:
 
         print(f"DuckDB: Bulk importing chunks from {folder_path}/*.parquet ...")
         
+        # Windows fix: When sending paths within SQL, it's always safer to use a '/'.
+        safe_path = folder_path.replace('\\', '/')
+        
         try:
             # DuckDB's glob (*) capability ensures it to retrieve thousands of files 
             # with a single SQL command without looping.
-            query = f"INSERT INTO roms SELECT * FROM read_parquet('{folder_path}/*.parquet', union_by_name=True);"
+            query = f"INSERT INTO roms SELECT * FROM read_parquet('{safe_path}/*.parquet', union_by_name=True);"
             self.conn.execute(query)
             
             print("Bulk Import Success.")
