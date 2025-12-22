@@ -63,7 +63,7 @@
             "CHANGELOG.md",
             "package.json",
             "pyproject.toml",
-            "src/_version.py",
+            "src/turbo_tosec/_version.py",
             "README.md",
             "README.tr.md"
           ],
