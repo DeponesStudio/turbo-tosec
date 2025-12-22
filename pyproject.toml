@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "turbo-tosec"
-version = "1.11.1"  # Starter version
+version = "1.11.2"  # Starter version
 description = "High-performance TOSEC DAT importer using DuckDB"
 authors = [
   { name="Berk Acunas", email="berkacunas@gmail.com" },

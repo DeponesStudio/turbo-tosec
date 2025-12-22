@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/DeponesLabs/turbo-tosec/compare/v1.11.1...v1.11.2) (2025-12-22)
+
+
+### Bug Fixes
+
+* **session:** remove background monitor in DirectMode to prevent double rendering ([ee69f0b](https://github.com/DeponesLabs/turbo-tosec/commit/ee69f0ba9afd3d5ed7e6cbcd214ed51839d0b1c9))
+
 ## [1.11.1](https://github.com/DeponesLabs/turbo-tosec/compare/v1.11.0...v1.11.1) (2025-12-22)
 
 
