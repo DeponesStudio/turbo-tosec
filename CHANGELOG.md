@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.11.2...v2.0.0) (2025-12-22)
+
+
+* feat(core)!: Turbo-TOSEC v2.0 Architecture Upgrade ([ccbc1a5](https://github.com/DeponesLabs/turbo-tosec/commit/ccbc1a5acb4e557e6b7605a660b9c6b19aec8223))
+* feat(core)!: Turbo-TOSEC v2.0 Architecture Upgrade ([bbe6595](https://github.com/DeponesLabs/turbo-tosec/commit/bbe6595c4019953989014a5556e0f62b35f38dae))
+
+
+### BREAKING CHANGES
+
+* This release introduces a complete architectural overhaul including Staged (ETL) and Direct (Zero-Copy) ingestion modes. CLI arguments have changed. Legacy support is retained but deprecated.
+* This release introduces a complete architectural overhaul including Staged (ETL) and Direct (Zero-Copy) ingestion modes. CLI arguments have changed. Legacy support is retained but deprecated.
+
 ## [1.11.2](https://github.com/DeponesLabs/turbo-tosec/compare/v1.11.1...v1.11.2) (2025-12-22)
 
 
