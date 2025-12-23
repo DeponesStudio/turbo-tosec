@@ -269,6 +269,9 @@ def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500
     Reads XML in a staging fashion and writes directly to Parquet using PyArrow.
     No Pandas dependency = Smaller EXE size.
     """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+        
     fmt = _detect_file_format(file_path)
     if fmt != 'xml':
         raise ValueError(f"SKIPPED_LEGACY_FORMAT: Detected '{fmt}'. staging mode requires XML.")
