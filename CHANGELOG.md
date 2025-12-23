@@ -1,3 +1,16 @@
+# [2.1.0](https://github.com/DeponesLabs/turbo-tosec/compare/v2.0.0...v2.1.0) (2025-12-23)
+
+
+### Bug Fixes
+
+* **tests:** update test data and assertions for v2.0 schema compatibility ([ea16f36](https://github.com/DeponesLabs/turbo-tosec/commit/ea16f36661d41df11110106a4a4e21c38cc375db))
+* **tests:** update tests to match v2.0 schema ([17e3a74](https://github.com/DeponesLabs/turbo-tosec/commit/17e3a748b6d50822b8b79a54ff043dea1a5ec1fb))
+
+
+### Features
+
+* **core:** add extended metadata columns (Category, Title, Year) ([a7baf71](https://github.com/DeponesLabs/turbo-tosec/commit/a7baf7122397485b394a641f959f423b8eb655cc))
+
 # [2.0.0](https://github.com/DeponesLabs/turbo-tosec/compare/v1.11.2...v2.0.0) (2025-12-22)
 
 

@@ -12,8 +12,8 @@ Geleneksel XML ayrıştırıcıların aksine **turbo-tosec v2.0**, gigabytelarce
 
 Python kurulumuna ihtiyaç duymadan, işletim sisteminize uygun derlenmiş sürümü kullanabilirsiniz:
 
-* **Windows:** [İndir `turbo-tosec_v2.0.0_Windows.exe`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
-* **Linux:** [İndir `turbo-tosec_v2.0.0_Linux.tar.gz`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
+* **Windows:** [İndir `turbo-tosec_v2.1.0_Windows.exe`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
+* **Linux:** [İndir `turbo-tosec_v2.1.0_Linux.tar.gz`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
 
 ## ⚡ Temel Özellikler
 
