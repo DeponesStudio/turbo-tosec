@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/DeponesLabs/turbo-tosec/compare/v2.1.1...v2.1.2) (2025-12-24)
+
+
+### Bug Fixes
+
+* **console:** align turbo-tosec-ascii-logo ([f04ec19](https://github.com/DeponesLabs/turbo-tosec/commit/f04ec1907f52a980d2686323e1e85383f1cb8e2f))
+
 ## [2.1.1](https://github.com/DeponesLabs/turbo-tosec/compare/v2.1.0...v2.1.1) (2025-12-23)
 
 
