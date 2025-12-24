@@ -17,7 +17,7 @@
             ]
         },
         {
-            "name": "Debug: Turbo-TOSEC (Staged Mode)",
+            "name": "Debug: Turbo-TOSEC (Staged Mode) 1",
             "type": "debugpy",
             "request": "launch",
             "module": "turbo_tosec.cli", 
@@ -28,6 +28,29 @@
                 "scan",
                 "--input", 
                 "${workspaceFolder}/TEST_DATS/TOSEC-v2016-11-11",
+                "--staged", 
+                "--workers", 
+                "4",
+                "--temp-dir",
+                "debug_temp_chunks"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug: Turbo-TOSEC (Staged Mode) 2",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "turbo_tosec.cli", 
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "scan",
+                "--input", 
+                "E:/HOME/RetroVault/TOSEC_DATs/Extracted/TOSEC-v2025-03-13",
+                "--output",
+                "E:/HOME/Documents/Databases/turbo-tosec/duckdb/tosec-v2025-03-13.duckdb",
                 "--staged", 
                 "--workers", 
                 "4",

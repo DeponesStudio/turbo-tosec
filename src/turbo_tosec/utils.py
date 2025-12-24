@@ -35,11 +35,11 @@ class Console:
         cols, _ = shutil.get_terminal_size((80, 20))
         
         logo = f"""{Console.OKBLUE}{Console.BOLD}
-______            __               ______
+   ______            __               ______
   /_  __/_  ______  / /_  ____       /_  __/___  ________  _____
    / / / / / / __ \/ __ \/ __ \_______/ / / __ \/ ___/ _ \/ ___/
-  / / / /_/ / / / / /_/ / /_/ /_____// / / /_/ (__  )  __/ /__
- /_/  \__,_/_/ /_/_.___/\____/      /_/  \____/____/\___/\___/
+  / / / /_/ / /   / /_/ / /_/ /_____// / / /_/ (__  )  __/ /__
+ /_/  \__,_/_/   /_.___/\____/      /_/  \____/____/\___/\___/
         {Console.ENDC}"""
         print(logo)
         print(f"{Console.OKCYAN}{':: HIGH-PERFORMANCE DATA INGESTION ENGINE ::'.center(cols)}{Console.ENDC}")
