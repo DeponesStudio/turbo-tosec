@@ -143,11 +143,11 @@ Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmışt�
 **turbo-tosec**, **Depones Labs** tarafından geliştirilmekte ve sürdürülmektedir. Eğer bu aracı yararlı bulduysanız, açık kaynak geliştirmeyi desteklemek için bağış yapmayı düşünebilirsiniz.
 
 <a href="[https://github.com/sponsors/berkacunas](https://github.com/sponsors/berkacunas)">
-<img src="[https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors)" height="50" alt="Sponsor on GitHub">
+<img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github-sponsors" height="50" alt="Sponsor on GitHub">
 </a>
 
 <a href="[https://www.buymeacoffee.com/depones](https://www.buymeacoffee.com/depones)" target="_blank">
-<img src="[https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;">
 </a>
 
 ---
