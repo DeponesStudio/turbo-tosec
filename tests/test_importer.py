@@ -1,7 +1,7 @@
 import pytest
 import os
 from turbo_tosec.database import DatabaseManager
-from turbo_tosec.parser import DatFileParser
+from turbo_tosec.parser import InMemoryParser
 
 # --- Mock Data Updated for v2.0 (14 Columns) ---
 # Old: (filename, platform, game, desc, rom, size, crc, md5, sha1, status, system)
@@ -48,7 +48,7 @@ def test_platform_parsing():
     Mock filename: 'Commodore Amiga - Games - [ADF] (TOSEC).dat'
     Expected: Platform='Commodore Amiga', Category='Games - [ADF]'
     """
-    parser = DatFileParser()
+    parser = InMemoryParser()
     
     # We provide a simulated file path
     # The parser attempts to extract system_name from the file path in the _get_common_info method
