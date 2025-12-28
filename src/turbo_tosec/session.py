@@ -13,23 +13,23 @@ import pyarrow as pa
 import xml.etree.ElementTree as ET
 
 from turbo_tosec.database import DatabaseManager
-from turbo_tosec.parser import DatFileParser
+from turbo_tosec.parser import InMemoryParser, TurboParser, parse_game_info
 from turbo_tosec.utils import Console
 
 def worker_parse_task(file_path: str) -> List[Tuple]:
     """
     Worker for InMemoryMode: Parses XML completely into RAM (and returns list of tuples).
     """
-    parser = DatFileParser()
+    parser = InMemoryParser()
     return parser.parse(file_path)
 
 def worker_staged_task(file_path: str, temp_dir: str) -> dict:
     """
     Worker for StagedMode: Parses XML and writes chunks to intermediate Parquet files.
     """
-    from turbo_tosec.parser import parse_and_save_chunks
     try:
-        result_stats = parse_and_save_chunks(file_path, temp_dir)
+        parser = TurboParser()
+        result_stats = parser.parse_and_save_chunks(file_path, temp_dir)
         return result_stats
     except Exception as error:
         raise RuntimeError(f"Error in {os.path.basename(file_path)}: {error}")
@@ -200,8 +200,8 @@ class ImportSession:
                     except Exception as error:
                         self._handle_error(error, file_path)
             finally:
+                self.executor.shutdown(wait=True)
                 self.executor = None
-                executor.shutdown(wait=True)
                 del executor
                 gc.collect()
                 self._stop_monitor()
@@ -226,7 +226,8 @@ class ImportSession:
         """
         # Define Schema (The Blueprint)
         schema = pa.schema([
-            ('filename', pa.string()), ('platform', pa.string()), ('game_name', pa.string()),
+            ('filename', pa.string()), ('platform', pa.string()), ('category', pa.string()),
+            ('game_name', pa.string()), ('title', pa.string()), ('release_year', pa.int32()),
             ('description', pa.string()), ('rom_name', pa.string()), ('size', pa.int64()),
             ('crc', pa.string()), ('md5', pa.string()), ('sha1', pa.string()), 
             ('status', pa.string()), ('system', pa.string())
@@ -246,7 +247,14 @@ class ImportSession:
                     except:
                         system_name = "Unknown"
                         
-                    platform = dat_filename.split(' - ')[0]
+                    # Category Extraction
+                    clean_name = dat_filename.rsplit('.', 1)[0]
+                    if "(TOSEC" in clean_name:
+                        clean_name = clean_name.split("(TOSEC")[0].strip()
+                    parts = clean_name.split(' - ', 1)
+                    
+                    platform = parts[0].strip()
+                    category = parts[1].strip() if len(parts) > 1 else "Standard"
                     
                     buffer = []
                     
@@ -255,6 +263,7 @@ class ImportSession:
                     for event, elem in context:
                         if elem.tag in ('game', 'machine'):
                             game_name = elem.get('name')
+                            title, release_year = parse_game_info(game_name)
                             desc_node = elem.find('description')
                             description = desc_node.text if desc_node is not None else ""
                             
@@ -268,7 +277,10 @@ class ImportSession:
                                 row = {
                                     'filename': dat_filename,
                                     'platform': platform,
+                                    'category': category,
                                     'game_name': game_name,
+                                    'title': title,
+                                    'release_year': release_year,
                                     'description': description,
                                     'rom_name': rom.get('name'),
                                     'size': s_val,
@@ -330,7 +342,7 @@ class ImportSession:
 
     def _run_serial(self, files, pbar):
         
-        parser = DatFileParser()
+        parser = InMemoryParser()
         for file_path in files:
             try:
                 data = parser.parse(file_path)

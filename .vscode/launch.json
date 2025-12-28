@@ -1,7 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
-        {
+        { // Python Debugger: Current File
             "name":"Python Debugger: Current File",
             "type":"debugpy",
             "request":"launch",
@@ -9,15 +9,15 @@
             "console":"integratedTerminal",
             "args": [
                 "--input", 
-                "${workspaceFolder}/TEST_DATS",
+                "${workspaceFolder}/TEST_AREA",
                 "--output",
                 "tosec_2012.duckdb",
                 "--workers", 
                 "1"
             ]
         },
-        {
-            "name": "Debug: Turbo-TOSEC (Staged Mode) 1",
+        { // Debug: Turbo-TOSEC Staged (v2012-04-23)
+            "name": "Debug: Turbo-TOSEC Staged (v2012-04-23)",
             "type": "debugpy",
             "request": "launch",
             "module": "turbo_tosec.cli", 
@@ -27,7 +27,9 @@
             "args": [
                 "scan",
                 "--input", 
-                "${workspaceFolder}/TEST_DATS/TOSEC-v2016-11-11",
+                "E:/HOME/RetroVault/TOSEC_DATs/Extracted/TOSEC-v2012-04-23",
+                "--output",
+                "${workspaceFolder}/TEST_AREA/v2012-04-23.duckdb",
                 "--staged", 
                 "--workers", 
                 "4",
@@ -37,8 +39,8 @@
             "console": "integratedTerminal",
             "justMyCode": true
         },
-        {
-            "name": "Debug: Turbo-TOSEC (Staged Mode) 2",
+        { // Debug: Turbo-TOSEC Staged (v2025-03-13)
+            "name": "Debug: Turbo-TOSEC Staged (v2025-03-13)",
             "type": "debugpy",
             "request": "launch",
             "module": "turbo_tosec.cli", 
@@ -60,8 +62,8 @@
             "console": "integratedTerminal",
             "justMyCode": true
         },
-        {
-            "name": "Debug: Turbo-TOSEC (Direct Mode)",
+        { // Debug: Turbo-TOSEC Direct (v2016-11-11)
+            "name": "Debug: Turbo-TOSEC Direct (v2016-11-11)",
             "type": "debugpy",
             "request": "launch",
             "module": "turbo_tosec.cli",
@@ -71,9 +73,28 @@
             "args": [
                 "scan",
                 "--input", 
-                "${workspaceFolder}/TEST_DATS/TOSEC-v2016-11-11",
+                "E:/HOME/RetroVault/TOSEC_DATs/Extracted/TOSEC-v2016-11-11",
                 "--output",
-                "${workspaceFolder}/TEST_DATS/direct.duckdb",
+                "${workspaceFolder}/TEST_AREA/v2016-11-11.duckdb",
+                "--direct"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        { // Debug: Turbo-TOSEC Direct (v2012-04-23)
+            "name": "Debug: Turbo-TOSEC Direct (v2016-11-11)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "turbo_tosec.cli",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "scan",
+                "--input", 
+                "E:/HOME/RetroVault/TOSEC_DATs/Extracted/TOSEC-v2012-04-23",
+                "--output",
+                "TOSEC-v2012-04-23.duckdb",
                 "--direct"
             ],
             "console": "integratedTerminal",

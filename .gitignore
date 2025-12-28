@@ -39,8 +39,8 @@ dist/
 build/
 *.egg-info/
 
-# local test files
-TEST_DATS/
+# local test Area
+TEST_AREA
 
 # artifact of debugging
 logs/
