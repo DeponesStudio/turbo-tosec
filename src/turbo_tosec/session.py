@@ -46,19 +46,21 @@ def get_dat_files(root_dir: str) -> List[str]:
 
 class ImportSession:
     """
-    Orchestrates the ingestion workflow using one of the 3 strategies:
+    Orchestrates the ingestion workflow.
+    Can be used via CLI (passing args) or as a Library (passing explicit params).
+    Ingests with one of the 3 strategies:
     1. InMemoryMode
     2. StagedMode
     3. DirectMode
     """
-    def __init__(self, args, db_manager: DatabaseManager, all_files: List[str]):
+    def __init__(self, db_manager: DatabaseManager, args=None,  # Optional for CLI
+                 workers: int = 0, temp_dir: str = "temp_chunks", batch_size: int = 1000):
         
         self.args = args
         self.db = db_manager
         self.buffer = []
         self.total_roms = 0
         self.error_count = 0
-        self.all_files = all_files
         self.stop_monitor = threading.Event()
         self.executor = None # To track active executor for cleanup
 
@@ -71,80 +73,102 @@ class ImportSession:
         # LegacyMode
         self.legacy = getattr(args, 'legacy', False)
         
-        # Temp dir is only relevant for StagedMode
-        self.temp_dir = getattr(args, 'temp_dir', 'temp_chunks')
-
-        if self.staged:
-            self._prepare_temp_dir()
+        # If CLI arguments are provided, use them; otherwise, use manual parameters
+        if args:
+            self.workers = getattr(args, 'workers', 0)
+            self.temp_dir = getattr(args, 'temp_dir', temp_dir)
+            self.batch_size = getattr(args, 'batch_size', batch_size)
+        else:
+            self.workers = workers
+            self.temp_dir = temp_dir    # Temp dir is only relevant for StagedMode
+            self.batch_size = batch_size
+        
+        # CPU core limit check
+        max_cpu = multiprocessing.cpu_count()
+        if self.workers <= 0 or self.workers > max_cpu:
+            self.workers = max_cpu
             
-    def _prepare_temp_dir(self):
-        """Cleans or creates the temporary staging directory for Parquet chunks."""
-        p = Path(self.temp_dir)
-        if p.exists():
-            try:
-                shutil.rmtree(p)
-            except Exception as error:
-                Console.warning(f"Warning: Could not clean temp dir {p}: {error}")
-                
-        p.mkdir(parents=True, exist_ok=True)
+    # *************************************************************************
+    # LIBRARY API
+    # *************************************************************************
+    def ingest(self, files: List[str], mode: str = 'direct', progress_callback = None) -> dict:
+        """
+        High-level entry point for Library/GUI usage.
+        
+        Args:
+            files: List of file paths to process.
+            mode: 'direct' (Recommended), 'staged' (Big Data), 'legacy' (Memory).
+            show_progress: If False, disables tqdm (useful for silent workers).
+            progress_callback: A function(current, total) to handle GUI updates.
+        
+        Returns:
+            dict: {'total_roms': int, 'errors': int}
+        """
+        # Return immediately if the file list is empty
+        if not files:
+            logging.warning("No files provided for ingestion.")
+            return {'total_roms': 0, 'errors': 0}
 
+        # Reset statistics (A new task is starting)
+        self.total_roms = 0
+        self.error_count = 0
+        
+        # Metrics
+        total_bytes = sum(os.path.getsize(f) for f in files)
+        
+        # Preparing for Staged mode
+        if mode == 'staged':
+            self._prepare_temp_dir()
+
+        # GUI entegrasyonunda buradaki tqdm'i override etmek gerekebilir
+        # ama şimdilik console output varsayıyoruz.
+        
+        try:
+            if mode == 'direct':
+                # Direct mode genellikle GUI için en iyisidir (Hızlı geri bildirim)
+                self._run_direct_mode(files, total_bytes, 0, progress_callback)
+            
+            elif mode == 'staged':
+                self._run_staged_mode(files, self.workers, total_bytes, 0, progress_callback)
+                
+            elif mode == 'legacy':
+                self._run_in_memory_mode(files, self.workers, total_bytes, 0, progress_callback)
+            
+            else:
+                raise ValueError(f"Unknown ingestion mode: {mode}")
+                
+        finally:
+            # Clean-up
+            if mode == 'staged' and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+        
+        return {'total_roms': self.total_roms, 'errors': self.error_count}
+    
+    # *************************************************************************
+    # CLI API
+    # *************************************************************************
     def run(self, files_to_process: List[str]):
         """
         Main execution entry point.
         """
+        mode = 'legacy'
+        if self.args:
+            if getattr(self.args, 'direct', False): 
+                mode = 'direct'
+            elif getattr(self.args, 'staged', False): 
+                mode = 'staged'
+            
          # ASCII Banner
         Console.banner()
+        stats = self.ingest(files_to_process, mode=mode)
         
-        Console.info("Calculating dataset metrics...")
-        total_bytes = sum(os.path.getsize(f) for f in self.all_files)
-        remaining_bytes = sum(os.path.getsize(f) for f in files_to_process)
-        initial_bytes = total_bytes - remaining_bytes
-        
-        # Check CPU core count to not exceed (ProcessPool consumes resources)
-        max_cpu = multiprocessing.cpu_count()
-        workers = min(self.args.workers, max_cpu) if self.args.workers > 0 else max_cpu
-
-        try:
-            # Strategy Routing
-            # ---------------------------------------------------------------------
-            if self.direct:
-                # Strategy 3: Direct Mode
-                Console.section(f"Strategy: Direct Mode (Stream)")
-                Console.info("Technique : Zero-Copy Ingestion (Apache Arrow)", indent=2)
-                Console.info("Threads   : Main Process + DuckDB Internal", indent=2)
-                Console.info("I/O Type  : Memory Stream", indent=2)
-                self._run_direct_mode(files_to_process, total_bytes, initial_bytes)
-                    
-            elif self.legacy:
-                # Strategy 1: In-Memory Mode
-                Console.section(f"Strategy: In-Memory Mode (Legacy/Standard)")
-                Console.info("Technique : DOM Parsing", indent=2)
-                Console.info(f"Workers   : {workers}", indent=2)
-                self._run_in_memory_mode(files_to_process, workers, total_bytes, initial_bytes)
-                
-            else:
-                # Strategy 2: Staged Mode
-                Console.section(f"Strategy: Staged Mode (Batch)")
-                Console.info("Technique : ETL (Extract -> Transform -> Load)", indent=2)
-                Console.info(f"Staging   : {self.temp_dir}/ (Parquet)", indent=2)
-                Console.info(f"Workers   : {workers}", indent=2)
-                self._run_staged_mode(files_to_process, workers, total_bytes, initial_bytes)
-
-        except KeyboardInterrupt:
-            Console.warning("Process interrupted by user (SIGINT).")
-        except Exception as error:
-            Console.error(f"System Failure: {error}")
-        finally:
-             if self.staged and os.path.exists(self.temp_dir):
-                Console.info("Cleaning up staging area...")
-                shutil.rmtree(self.temp_dir)
-
-        return self.total_roms, self.error_count
+        return stats['total_roms'], stats['errors']
 
     # Strategy 1: In-memory
-    def _run_in_memory_mode(self, files, workers, total_bytes, initial_bytes):
+    def _run_in_memory_mode(self, files, workers, total_bytes, initial_bytes, progress_callback=None):
         
-        with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, unit_divisor=1024) as pbar:
+        with UniversalProgress(total=total_bytes, initial=initial_bytes, 
+                               desc="Direct Ingestion", callback=progress_callback) as pbar:
             
             self._start_monitor(pbar)
             if workers < 2:
@@ -157,10 +181,10 @@ class ImportSession:
         self._flush_buffer() # Write any remaining data
 
     # Strategy 2: Staged 
-    def _run_staged_mode(self, files, workers, total_bytes, initial_bytes):
+    def _run_staged_mode(self, files, workers, total_bytes, initial_bytes, progress_callback=None):
         # Parse -> Parquet Files -> Bulk Import
-        with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, 
-                  unit_divisor=1024, desc="Generating Parquet") as pbar:
+        with UniversalProgress(total=total_bytes, initial=initial_bytes, 
+                               desc="Direct Ingestion", callback=progress_callback) as pbar:
             
             self._start_monitor(pbar)
             executor = concurrent.futures.ProcessPoolExecutor(max_workers=workers)
@@ -219,105 +243,37 @@ class ImportSession:
             Console.warning("No ROMs found to import.")
 
     # Strategy 3: Direct Mode
-    def _run_direct_mode(self, files, total_bytes, initial_bytes):
+    def _run_direct_mode(self, files, total_bytes, initial_bytes, progress_callback=None):
         """
         Parses XML stream and injects directly into DuckDB via Arrow.
         Runs in Main Thread to utilize DuckDB's connection safely.
         """
-        # Define Schema (The Blueprint)
-        schema = pa.schema([
-            ('filename', pa.string()), ('platform', pa.string()), ('category', pa.string()),
-            ('game_name', pa.string()), ('title', pa.string()), ('release_year', pa.int32()),
-            ('description', pa.string()), ('rom_name', pa.string()), ('size', pa.int64()),
-            ('crc', pa.string()), ('md5', pa.string()), ('sha1', pa.string()), 
-            ('status', pa.string()), ('system', pa.string())
-        ])
-
-        chunk_size = 50000 
-        
-        with tqdm(total=total_bytes, initial=initial_bytes, unit='B', unit_scale=True, 
-                  unit_divisor=1024, desc="Direct Ingestion") as pbar:
+        parser = TurboParser()
+            
+        with UniversalProgress(total=total_bytes, initial=initial_bytes, 
+                               desc="Direct Ingestion", callback=progress_callback) as pbar:
             
             for file_path in files:
                 try:
-                    # Metadata Extraction
-                    dat_filename = os.path.basename(file_path)
-                    try:
-                        system_name = os.path.basename(os.path.dirname(file_path))
-                    except:
-                        system_name = "Unknown"
+                    arrow_stream = parser.parse_to_arrow_stream(file_path, chunk_size=50000)
+                    for arrow_batch in arrow_stream:
+                        # 1. DuckDB'ye Hızlı Kayıt (Zero-Copy sayılır)
+                        # 'arrow_batch' değişkeni SQL sorgusu içinde doğrudan kullanılır.
+                        self.db.conn.execute("INSERT INTO roms SELECT * FROM arrow_batch")
                         
-                    # Category Extraction
-                    clean_name = dat_filename.rsplit('.', 1)[0]
-                    if "(TOSEC" in clean_name:
-                        clean_name = clean_name.split("(TOSEC")[0].strip()
-                    parts = clean_name.split(' - ', 1)
-                    
-                    platform = parts[0].strip()
-                    category = parts[1].strip() if len(parts) > 1 else "Standard"
-                    
-                    buffer = []
-                    
-                    # XML Stream Parsing (Iterparse)
-                    context = ET.iterparse(file_path, events=("end",))
-                    for event, elem in context:
-                        if elem.tag in ('game', 'machine'):
-                            game_name = elem.get('name')
-                            title, release_year = parse_game_info(game_name)
-                            desc_node = elem.find('description')
-                            description = desc_node.text if desc_node is not None else ""
-                            
-                            for rom in elem.findall('rom'):
-                                # Parsing Size safely
-                                try:
-                                    s_val = int(rom.get('size', 0))
-                                except:
-                                    s_val = 0
-                                    
-                                row = {
-                                    'filename': dat_filename,
-                                    'platform': platform,
-                                    'category': category,
-                                    'game_name': game_name,
-                                    'title': title,
-                                    'release_year': release_year,
-                                    'description': description,
-                                    'rom_name': rom.get('name'),
-                                    'size': s_val,
-                                    'crc': rom.get('crc'),
-                                    'md5': rom.get('md5'),
-                                    'sha1': rom.get('sha1'),
-                                    'status': rom.get('status', 'good'),
-                                    'system': system_name
-                                }
-                                buffer.append(row)
-                            
-                            elem.clear() # Memory Cleanup
-                            
-                            # Flush Buffer to DB via Arrow
-                            if len(buffer) >= chunk_size:
-                                arrow_table = pa.Table.from_pylist(buffer, schema=schema)
-                                self.db.conn.execute("INSERT INTO roms SELECT * FROM arrow_table")
-                                self.total_roms += len(buffer)
-                                buffer = []
-                                pbar.set_postfix({"ROMs": self.total_roms})
+                        # 2. İstatistikleri Güncelle
+                        rows_in_batch = arrow_batch.num_rows
+                        self.total_roms += rows_in_batch
+                        pbar.set_postfix({"ROMs": self.total_roms})
 
-                    # Flush Tail
-                    if buffer:
-                        arrow_table = pa.Table.from_pylist(buffer, schema=schema)
-                        self.db.conn.execute("INSERT INTO roms SELECT * FROM arrow_table")
-                        self.total_roms += len(buffer)
-                    
-                    # Update Progress
+                    # 3. Progress Bar (Dosya boyutu kadar ilerlet)
                     try:
                         pbar.update(os.path.getsize(file_path))
                     except:
                         pbar.update(0)
                         
-                    pbar.set_postfix({"ROMs": self.total_roms})
-                    
-                except Exception as e:
-                    self._handle_error(e, file_path)
+                except Exception as error:
+                    self._handle_error(error, file_path)
             
     def _start_monitor(self, pbar):
         self.stop_monitor.clear()
@@ -382,7 +338,18 @@ class ImportSession:
             pbar.update(os.path.getsize(file_path))
         except:
             pbar.update(0)
+
+    def _prepare_temp_dir(self):
+        """Cleans or creates the temporary staging directory for Parquet chunks."""
+        p = Path(self.temp_dir)
+        if p.exists():
+            try:
+                shutil.rmtree(p)
+            except Exception as error:
+                Console.warning(f"Warning: Could not clean temp dir {p}: {error}")
                 
+        p.mkdir(parents=True, exist_ok=True)
+
     def _handle_error(self, error, file_path):
         
         error_msg = str(error).lower()
@@ -394,3 +361,45 @@ class ImportSession:
         tqdm.write(f"{Console.SYM_FAIL} Failed: {os.path.basename(file_path)} (Check logs)")
         logging.error(f"Failed: {file_path} -> {error}")
     
+class UniversalProgress:
+    """
+    A wrapper that abstracts progress reporting.
+    If a 'callback' is provided (GUI mode), it invokes the callback.
+    If no callback is provided (CLI mode), it uses 'tqdm' for console output.
+    """
+    def __init__(self, total: int, initial: int = 0, desc: str = "", unit: str = 'B', callback=None):
+        self.callback = callback
+        self.total = total
+        self.current = initial
+        self.pbar = None
+        
+        if not self.callback:
+            # CLI Mode: Initialize tqdm
+            self.pbar = tqdm(total=total, initial=initial, unit=unit, unit_scale=True, unit_divisor=1024, desc=desc)
+
+    def update(self, n: int):
+        self.current += n
+        if self.pbar:
+            self.pbar.update(n)
+        elif self.callback:
+            # GUI Mode: Send (current, total)
+            # GUI tarafı bu değerleri alıp progress bar'ı set edecek.
+            self.callback(self.current, self.total)
+
+    def set_postfix(self, stats: dict):
+        if self.pbar:
+            self.pbar.set_postfix(stats)
+        elif self.callback:
+            # Optional: This can be expanded if the GUI callback accepts a third parameter (stats). 
+            # # For now, only percentages are sent to the GUI.
+            pass
+
+    def close(self):
+        if self.pbar:
+            self.pbar.close()
+
+    def __enter__(self): 
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb): 
+        self.close()

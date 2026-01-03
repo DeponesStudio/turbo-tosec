@@ -174,9 +174,7 @@ def run_scan_mode(args, log_filename: str):
         db.configure_threads(args.workers)
         
         # Start Session
-        # ImportSession will look at args.staged and args.direct to decide the strategy
-        #------------------------------------------------------------------------------
-        session = ImportSession(args, db, all_dat_files)
+        session = ImportSession(db_manager=db, args=args)
         total_roms, error_count = session.run(files_to_process)
 
     end_time = time.time()

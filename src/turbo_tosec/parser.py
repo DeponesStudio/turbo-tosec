@@ -158,7 +158,6 @@ def _get_common_info(file_path: str) -> Tuple[str, str, str]:
     
     return dat_filename, platform, category, system_name
     
-
 def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500000) -> Dict:
     """
     Reads XML in a staging fashion and writes directly to Parquet using PyArrow.
@@ -364,6 +363,14 @@ class TurboParser:
     """
     Handles parsing of TOSEC DAT files in both XML and legacy CMP formats.
     """
+    ARROW_SCHEMA = pa.schema([
+        ('filename', pa.string()), ('platform', pa.string()), ('category', pa.string()),
+        ('game_name', pa.string()), ('title', pa.string()), ('release_year', pa.int32()),
+        ('description', pa.string()), ('rom_name', pa.string()), ('size', pa.int64()),
+        ('crc', pa.string()), ('md5', pa.string()), ('sha1', pa.string()), 
+        ('status', pa.string()), ('system', pa.string())
+    ])
+    
     def __init__(self):
         pass
     
@@ -517,6 +524,42 @@ class TurboParser:
             logging.warning(f"Skipped (Unknown Format): {file_path}")
             # Unknown format; it doesn't throw an error.
             return
+    
+    def parse_to_arrow_stream(self, file_path: str, chunk_size: int = 50000) -> Iterator[pa.Table]:
+        """
+        Consumes the self.parse() generator, buffers the tuples, and yields 
+        ready-to-insert PyArrow Tables. 
+        
+        This is used by Session (Direct Mode) and GUI (Preview).
+        """
+        buffer = []
+        
+        try:
+            record_iterator = self.parse(file_path)
+            
+            for record in record_iterator:
+                # Convert Tuple -> Dict (for PyArrow Table)
+                row = {
+                    'filename': record[0], 'platform': record[1], 'category': record[2],
+                    'game_name': record[3], 'title': record[4], 'release_year': record[5],
+                    'description': record[6], 'rom_name': record[7], 'size': record[8],
+                    'crc': record[9], 'md5': record[10], 'sha1': record[11],
+                    'status': record[12], 'system': record[13]
+                }
+                buffer.append(row)
+                
+                # If buffer is full, create an Arrow Table and yield it
+                if len(buffer) >= chunk_size:
+                    yield pa.Table.from_pylist(buffer, schema=self.ARROW_SCHEMA)
+                    buffer = []
+            
+            # Yield the remainings in buffer
+            if buffer:
+                yield pa.Table.from_pylist(buffer, schema=self.ARROW_SCHEMA)
+                
+        except Exception as error:
+            logging.error(f"Arrow Stream Error in {file_path}: {error}")
+            raise error
         
     def parse_and_save_chunks(self, file_path: str, output_dir: str, chunk_size: int = 500000) -> Dict:
         """
@@ -530,15 +573,6 @@ class TurboParser:
         buffer = []
         chunk_index = 0
         total_roms = 0
-        
-        # PyArrow schema
-        schema = pa.schema([
-            ('filename', pa.string()), ('platform', pa.string()), ('category', pa.string()),
-            ('game_name', pa.string()), ('title', pa.string()), ('release_year', pa.int32()),
-            ('description', pa.string()), ('rom_name', pa.string()), ('size', pa.int64()),
-            ('crc', pa.string()), ('md5', pa.string()), ('sha1', pa.string()), 
-            ('status', pa.string()), ('system', pa.string())
-        ])
         
         try:
             # 1. Request Data from Source (Pull Model)
@@ -560,13 +594,13 @@ class TurboParser:
                 
                 # 2. Write and empty the buffer if full.
                 if len(buffer) >= chunk_size:
-                    _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, schema)
+                    _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
                     buffer = [] 
                     chunk_index += 1
             
             # 3. Write the last chunk
             if buffer:
-                _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, schema)
+                _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
                 
             return {"roms": total_roms, "chunks": chunk_index + 1}
 
