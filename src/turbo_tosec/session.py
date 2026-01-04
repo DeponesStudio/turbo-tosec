@@ -80,7 +80,7 @@ class ImportSession:
             self.batch_size = getattr(args, 'batch_size', batch_size)
         else:
             self.workers = workers
-            self.temp_dir = temp_dir    # Temp dir is only relevant for StagedMode
+            self.temp_dir = temp_dir    # Temp dir is only relevant for Staged Mode
             self.batch_size = batch_size
         
         # CPU core limit check
@@ -91,7 +91,7 @@ class ImportSession:
     # *************************************************************************
     # LIBRARY API
     # *************************************************************************
-    def ingest(self, files: List[str], mode: str = 'direct', progress_callback = None) -> dict:
+    def ingest(self, files: List[str], mode: str = 'staged', progress_callback = None) -> dict:
         """
         High-level entry point for Library/GUI usage.
         
@@ -280,8 +280,8 @@ class ImportSession:
         def monitor_progress():
             while not self.stop_monitor.is_set():
                 time.sleep(1)
-                if hasattr(pbar, 'pbar') and pbar.pbar:
-                    pbar.pbar.refresh()
+                if hasattr(pbar, 'console_bar') and pbar.console_bar:
+                    pbar.console_bar.refresh()
         
         self.monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
         self.monitor_thread.start()
@@ -369,38 +369,44 @@ class UniversalProgress:
     If no callback is provided (CLI mode), it uses 'tqdm' for console output.
     """
     def __init__(self, total: int, initial: int = 0, desc: str = "", unit: str = 'B', callback=None):
+        
         self.callback = callback
         self.total = total
         self.current = initial
-        self.pbar = None
+        self.console_bar = None
         
         if not self.callback:
             # CLI Mode: Initialize tqdm
-            self.pbar = tqdm(total=total, initial=initial, unit=unit, unit_scale=True, unit_divisor=1024, desc=desc)
+            self.console_bar = tqdm(total=total, initial=initial, unit=unit, unit_scale=True, unit_divisor=1024, desc=desc)
 
     def update(self, n: int):
+        
         self.current += n
-        if self.pbar:
-            self.pbar.update(n)
+        if self.console_bar:
+            self.console_bar.update(n)
         elif self.callback:
             # GUI Mode: Send (current, total)
-            # GUI tarafı bu değerleri alıp progress bar'ı set edecek.
+            # The GUI will take these values ​​and set the progress bar.
             self.callback(self.current, self.total)
 
     def set_postfix(self, stats: dict):
-        if self.pbar:
-            self.pbar.set_postfix(stats)
+        
+        if self.console_bar:
+            self.console_bar.set_postfix(stats)
         elif self.callback:
             # Optional: This can be expanded if the GUI callback accepts a third parameter (stats). 
             # # For now, only percentages are sent to the GUI.
             pass
 
     def close(self):
-        if self.pbar:
-            self.pbar.close()
+        
+        if self.console_bar:
+            self.console_bar.close()
 
     def __enter__(self): 
+        
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb): 
+        
         self.close()
