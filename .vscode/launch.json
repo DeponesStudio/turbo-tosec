@@ -99,6 +99,42 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {   // Debug: Turbo-TOSEC export to parquet
+            "name": "Debug: Turbo-TOSEC Export to Parquet (v2012-04-23)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "turbo_tosec.cli",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "parquet",
+                "-o", 
+                "${workspaceFolder}/TEST_AREA/v2012-04-23.parquet",
+                "-d",
+                "${workspaceFolder}/TEST_AREA/v2012-04-23.duckdb",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {   // Debug: Turbo-TOSEC Import from Parquet
+            "name": "Debug: Turbo-TOSEC Import from Parquet (v2012-04-23)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "turbo_tosec.cli",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "parquet",
+                "-i", 
+                "${workspaceFolder}/TEST_AREA/v2012-04-23.parquet",
+                "-d",
+                "${workspaceFolder}/TEST_AREA/v2012-04-23-from-parquest.duckdb",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

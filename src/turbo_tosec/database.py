@@ -135,17 +135,17 @@ class DatabaseManager:
         for filename in unique_files:
             self.conn.execute("INSERT OR IGNORE INTO processed_files (filename) VALUES (?)", (filename, ))
             
-    def export_to_parquet(self, db_path: str, parquet_path: str, threads: int = 1):
+    def export_to_parquet(self, parquet_path: str, threads: int = 1):
     
-        if not os.path.exists(db_path):
-            print(f"  Database not found: {db_path}")
+        if not os.path.exists(self.db_path):
+            print(f"  Database not found: {self.db_path}")
             return
 
         print(f"  Exporting database to Parquet: {parquet_path} (Threads: {threads})...")
         start = time.time()
         
         try:
-            conn = duckdb.connect(db_path)
+            conn = duckdb.connect(self.db_path)
             conn.execute(f"PRAGMA threads={threads}")
             conn.execute(f"COPY roms TO '{parquet_path}' (FORMAT PARQUET, COMPRESSION 'SNAPPY')")
             conn.close()
@@ -154,17 +154,17 @@ class DatabaseManager:
         except Exception as error:
             print(f"  Export failed: {error}")
 
-    def import_from_parquet(self, db_path: str, parquet_path: str, threads: int = 1):
+    def import_from_parquet(self, parquet_path: str, threads: int = 1):
         
         if not os.path.exists(parquet_path):
             print(f"  Parquet file not found: {parquet_path}")
             return
 
-        print(f"  Importing Parquet into database: {db_path} (Threads: {threads})...")
+        print(f"  Importing Parquet into database: {self.db_path} (Threads: {threads})...")
         start = time.time()
         
         try:
-            conn = duckdb.connect(db_path) 
+            conn = duckdb.connect(self.db_path) 
             self._setup_schema(target_conn=conn)
             conn.execute(f"PRAGMA threads={threads}")   
             # Read Parquet and insert into table
