@@ -123,19 +123,6 @@ def _try_parse_size(raw_value: str) -> int:
     # If no match.
     raise ValueError(f"Unknown/Unparsable size format: '{raw_value}'")
 
-def _write_chunk_arrow(data: List[Dict], output_dir: str, original_filename: str, index: int, schema: pa.Schema):
-    """Writes a list of dicts to Parquet using pure PyArrow."""
-    if not data:
-        return
-
-    safe_name = "".join(x for x in original_filename if x.isalnum() or x in "._-")
-    output_path = os.path.join(output_dir, f"{safe_name}_part_{index}.parquet")
-    
-    # 1. List of Dicts -> PyArrow Table
-    table = pa.Table.from_pylist(data, schema=schema)
-    # 2. Write to Disk
-    pq.write_table(table, output_path, compression='snappy')
-
 def _get_common_info(file_path: str) -> Tuple[str, str, str]:
     
     dat_filename = os.path.basename(file_path)
@@ -158,103 +145,6 @@ def _get_common_info(file_path: str) -> Tuple[str, str, str]:
     
     return dat_filename, platform, category, system_name
     
-def parse_and_save_chunks(file_path: str, output_dir: str, chunk_size: int = 500000) -> Dict:
-    """
-    Reads XML in a staging fashion and writes directly to Parquet using PyArrow.
-    No Pandas dependency = Smaller EXE size.
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-        
-    fmt = _detect_file_format(file_path)
-    if fmt != 'xml':
-        raise ValueError(f"SKIPPED_LEGACY_FORMAT: Detected '{fmt}'. staging mode requires XML.")
-    
-    dat_filename = os.path.basename(file_path)
-    try:
-        system_name = os.path.basename(os.path.dirname(file_path))
-    except:
-        system_name = "Unknown"
-    
-    # Category Extraction
-    clean_name = dat_filename.rsplit('.', 1)[0]
-    if "(TOSEC" in clean_name:
-        clean_name = clean_name.split("(TOSEC")[0].strip()
-    parts = clean_name.split(' - ', 1)
-    
-    platform = parts[0].strip()
-    category = parts[1].strip() if len(parts) > 1 else "Standard"
-
-    buffer = []
-    chunk_index = 0
-    total_roms = 0
-    
-    # PyArrow Schema (Define manually for type-safety)
-    # DuckDB recognizes types automatically.
-    schema = pa.schema([('filename', pa.string()), 
-                        ('platform', pa.string()),
-                        ('category', pa.string()),
-                        ('game_name', pa.string()),
-                        ('title', pa.string()),
-                        ('release_year', pa.int32()),
-                        ('description', pa.string()), 
-                        ('rom_name', pa.string()), 
-                        ('size', pa.int64()),
-                        ('crc', pa.string()), 
-                        ('md5', pa.string()), 
-                        ('sha1', pa.string()), 
-                        ('status', pa.string()), 
-                        ('system', pa.string())
-    ])
-    
-    try:
-        context = ET.iterparse(file_path, events=("end",))
-        
-        for event, elem in context:
-            if elem.tag in ('game', 'machine'):
-                game_name = elem.get('name')
-                title, release_year = parse_game_info(game_name)
-                desc_node = elem.find('description')
-                description = desc_node.text if desc_node is not None else ""
-                
-                for rom in elem.findall('rom'):
-                    final_size = _try_parse_size(rom.get('size'))
-                    
-                    row = {
-                        'filename': dat_filename,
-                        'platform': platform,
-                        'category': category,
-                        'game_name': game_name,
-                        'title': title,
-                        'release_year': release_year,
-                        'description': description,
-                        'rom_name': rom.get('name'),
-                        'size': final_size,
-                        'crc': rom.get('crc'),
-                        'md5': rom.get('md5'),
-                        'sha1': rom.get('sha1'),
-                        'status': rom.get('status', 'good'),
-                        'system': system_name
-                    }
-                    buffer.append(row)
-                    total_roms += 1
-                
-                elem.clear()
-                
-                if len(buffer) >= chunk_size:
-                    _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, schema)
-                    buffer = [] 
-                    chunk_index += 1
-        
-        if buffer:
-            _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, schema)
-            
-        return {"roms": total_roms, "chunks": chunk_index + 1}
-
-    except Exception as error:
-        logging.error(f"Staging Error in {file_path}: {error}")
-        raise error
-
 class InMemoryParser:
     """
     Handles parsing of TOSEC DAT files in both XML and legacy CMP formats.
@@ -510,6 +400,20 @@ class TurboParser:
             logging.error(f"Failed (Read CMP): {file_path} -> {error}")
             raise error
 
+    @staticmethod
+    def _write_chunk_arrow(data: List[Dict], output_dir: str, original_filename: str, index: int, schema: pa.Schema):
+        """Writes a list of dicts to Parquet using pure PyArrow."""
+        if not data:
+            return
+
+        safe_name = "".join(x for x in original_filename if x.isalnum() or x in "._-")
+        output_path = os.path.join(output_dir, f"{safe_name}_part_{index}.parquet")
+        
+        # 1. List of Dicts -> PyArrow Table
+        table = pa.Table.from_pylist(data, schema=schema)
+        # 2. Write to Disk
+        pq.write_table(table, output_path, compression='snappy')
+    
     def parse(self, file_path: str) -> Iterator[Tuple]:
         """
         Polyglot Parser: Detects the dat format and streams the data from the correct parser.
@@ -594,13 +498,13 @@ class TurboParser:
                 
                 # 2. Write and empty the buffer if full.
                 if len(buffer) >= chunk_size:
-                    _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
+                    TurboParser._write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
                     buffer = [] 
                     chunk_index += 1
             
             # 3. Write the last chunk
             if buffer:
-                _write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
+                TurboParser._write_chunk_arrow(buffer, output_dir, dat_filename, chunk_index, self.ARROW_SCHEMA)
                 
             return {"roms": total_roms, "chunks": chunk_index + 1}
 
