@@ -12,8 +12,8 @@ Unlike traditional XML parsers, **turbo-tosec v2.0** utilizes modern **Zero-Copy
 
 If you don't want to install Python, simply download the standalone executable for your OS:
 
-* **Windows:** [Download `turbo-tosec_v2.2.0_Windows.exe`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
-* **Linux:** [Download `turbo-tosec_v2.2.0_Linux.tar.gz`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
+* **Windows:** [Download `turbo-tosec_v2.2.1_Windows.exe`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
+* **Linux:** [Download `turbo-tosec_v2.2.1_Linux.tar.gz`](https://github.com/deponeslabs/turbo-tosec/releases/latest)
 
 ---
 

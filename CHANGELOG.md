@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/DeponesLabs/turbo-tosec/compare/v2.2.0...v2.2.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* remove db_path parameter and add as a member var in parquet conversion funcs ([8ea3d7d](https://github.com/DeponesLabs/turbo-tosec/commit/8ea3d7d70de9b7b5e95607ae3769eed828052a6f))
+
 # [2.2.0](https://github.com/DeponesLabs/turbo-tosec/compare/v2.1.3...v2.2.0) (2026-01-04)
 
 
